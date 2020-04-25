@@ -1,0 +1,14 @@
+doctype html
+html(lang="en")
+  head
+    title= title
+    meta(charset="utf-8")
+    link(rel="stylesheet", src="/main.css")
+    block scripts
+  body
+    header
+      h1= title
+    main
+      block main
+    footer
+      a(href=homepage) project source code

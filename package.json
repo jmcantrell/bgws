@@ -1,11 +1,14 @@
 {
   "name": "tttws",
   "version": "1.0.0",
+  "title": "Tic-Tac-Toe with STRANGERS",
   "description": "multiplayer tic-tac-toe web application",
+  "homepage": "https://github.com/jmcantrell/tttws",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "start-dev": "nodemon server.js",
+    "start-dev": "nodemon server.js | pino-pretty -tc",
+    "start-inspect": "LOG_LEVEL=silent node inspect server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

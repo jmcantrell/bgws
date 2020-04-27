@@ -1,1 +1,16 @@
 extends layout.pug
+
+block links
+  link(rel="stylesheet", href="/index.css")
+
+block scripts
+  script(defer, src="/index.js")
+
+block main
+
+  p.
+    Click the link below to play a game of tic-tac-toe with a complete
+    stranger!
+
+  p
+    a(href="/game") join a game

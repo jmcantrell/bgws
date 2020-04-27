@@ -1,56 +1,36 @@
 const WebSocket = require("ws");
-const logger = require("./logger");
-
-const clients = new Set();
-
-const intervals = [];
-
-function every(ms, cb) {
-  intervals.push(setInterval(cb, ms));
-}
-
-every(30000, () => {
-  for (const ws of clients) {
-    if (!ws.active) {
-      logger.info("terminating inactive websocket client");
-      return ws.terminate();
-    }
-    ws.active = false;
-    ws.ping(() => {
-      logger.trace("pinging websocket client");
-    });
-  }
-});
 
 module.exports.setup = (server) => {
-
-  const wss = new WebSocket.Server({ server, clientTracking: false });
+  const wss = new WebSocket.Server({ server });
 
   wss.on("connection", (ws) => {
-    logger.info("client connected to websocket");
-    clients.add(ws);
+    console.log("client connected to websocket");
 
     ws.active = true;
     ws.on("pong", () => {
-      logger.trace("websocket client ponged");
       ws.active = true;
     });
 
-    ws.on("message", function (message) {
-      logger.info(`websocket client sent message "${message}"`);
-    });
-
     ws.on("close", function () {
-      logger.info("client disconnected from websocket");
-      clients.delete(ws);
+      console.log("client disconnected from websocket");
     });
   });
 
   wss.on("close", () => {
-    logger.info("closing websocket server");
-    for (const interval of intervals) {
-      clearInterval(interval);
-    }
+    console.log("closing websocket server");
+    clearInterval(pingInterval);
   });
 
+  const pingInterval = setInterval(() => {
+    for (const ws of wss.clients) {
+      if (!ws.active) {
+        console.log("terminating inactive websocket client");
+        return ws.terminate();
+      }
+      ws.active = false;
+      ws.ping();
+    }
+  }, 30000);
+
+  return wss;
 };

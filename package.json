@@ -7,8 +7,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "start-dev": "nodemon server.js | pino-pretty -tc",
-    "start-inspect": "LOG_LEVEL=silent node inspect server.js",
+    "start-dev": "nodemon server.js",
+    "start-inspect": "node inspect server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -22,10 +22,10 @@
     "compression": "^1.7.4",
     "express": "^4.17.1",
     "helmet": "^3.22.0",
-    "pino": "^6.2.1",
-    "pino-http": "^5.1.0",
+    "mongodb": "^3.5.6",
     "pug": "^2.0.4",
-    "throng": "^4.0.0",
+    "redis": "^3.0.2",
+    "uuid": "^7.0.3",
     "ws": "^7.2.3"
   },
   "optionalDependencies": {

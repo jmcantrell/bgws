@@ -1,0 +1,28 @@
+extends layout.pug
+
+block links
+  link(rel="stylesheet", href="/game.css")
+
+block scripts
+  script(defer, src="/game.js")
+
+block body
+  div.overlay
+
+    div.hide.dialog#message
+      div#message-text
+      div#message-actions
+
+    div.hide.dialog#loading
+      div#loading-text
+      div#loading-spinner
+
+block nav
+  a(href="/") new game
+  a(href="/") exit
+
+block main
+  div.hide#game
+    each row in [0, 1, 2]
+      each col in [0, 1, 2]
+        div.cell(id=`cell-${row}${col}`)

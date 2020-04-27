@@ -3,12 +3,16 @@ html(lang="en")
   head
     title= title
     meta(charset="utf-8")
-    link(rel="stylesheet", src="/main.css")
+    link(rel="stylesheet", href="/main.css")
+    block links
     block scripts
   body
-    header
+    block body
+    header#header
       h1= title
-    main
+    nav
+      block nav
+    main#main
       block main
-    footer
-      a(href=homepage) project source code
+    footer#footer
+      a(href=homepage) code

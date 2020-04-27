@@ -1,0 +1,58 @@
+.overlay {
+  top: 35%;
+  width: 100%;
+  position: absolute;
+  display: grid;
+  justify-items: center;
+}
+
+.dialog {
+  padding: 2em;
+  border: 10px solid white;
+  color: white;
+  background-color: #005;
+}
+
+#loading {
+  width: 45vw;
+  display: flex;
+  align-items: center;
+  justify-content: space-evenly;
+}
+
+#loading-spinner {
+  font-size: 2em;
+  margin-left: 0.5em;
+}
+
+#message-actions {
+  margin-top: 1em;
+  display: flex;
+  justify-content: space-evenly;
+}
+
+#game {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  font-size: 3em;
+  background-color: #333;
+  padding: 0.1em;
+}
+
+.hide {
+  display: none !important;
+}
+
+.cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 5px solid #555;
+  background-color: black;
+}
+
+.playable:hover {
+  cursor: pointer;
+  background-color: #111;
+}

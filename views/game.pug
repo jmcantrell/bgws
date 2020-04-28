@@ -12,6 +12,7 @@ block body
     div.hide.dialog#message
       div#message-text
       div#message-actions
+        a#message-okay(href="#") okay
 
     div.hide.dialog#loading
       div#loading-text
@@ -22,7 +23,7 @@ block nav
   a(href="/") exit
 
 block main
-  div.hide#game
+  div#game
     each row in [0, 1, 2]
       each col in [0, 1, 2]
         div.cell(id=`cell-${row}${col}`)

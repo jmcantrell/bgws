@@ -7,8 +7,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "start-dev": "nodemon server.js",
-    "start-inspect": "node inspect server.js",
+    "start-dev": "LOG_LEVEL=trace nodemon server.js",
+    "start-inspect": "LOG_LEVEL=silent node inspect server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -36,7 +36,6 @@
   "devDependencies": {
     "eslint": "^6.8.0",
     "nodemon": "^2.0.3",
-    "pino-pretty": "^4.0.0",
     "prettier": "^2.0.5"
   }
 }

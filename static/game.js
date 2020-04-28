@@ -10,11 +10,53 @@ const loadingSpinner = document.getElementById("loading-spinner");
 
 const messageContainer = document.getElementById("message");
 const messageText = document.getElementById("message-text");
-const messageActions = document.getElementById("message-actions");
+const messageOkay = document.getElementById("message-okay");
 
 let spinnerInterval;
 
-let gameBoard;
+let state;
+
+window.addEventListener("load", () => {
+  showLoading("Waiting for opponent.");
+  window.addEventListener("resize", resizeGame);
+  resizeGame();
+});
+
+ws.addEventListener("message", (event) => {
+  const command = JSON.parse(event.data);
+  console.log("received from server:", command);
+  switch (command.action) {
+    case "update":
+      updateGame(command.update);
+      break;
+    case "close":
+      showMessage(command.reason);
+      break;
+  }
+});
+
+ws.addEventListener("open", () => {
+  console.log("websocket connection opened");
+});
+
+ws.addEventListener("error", (error) => {
+  console.error("websocket error: ", error);
+});
+
+ws.addEventListener("close", () => {
+  console.log("websocket connection closed");
+  showMessage("Lost connection to server!");
+});
+
+messageOkay.addEventListener("click", () => {
+  hideMessage();
+});
+
+function showMessage(text) {
+  hideDialogs();
+  messageText.innerHTML = text;
+  messageContainer.classList.remove("hide");
+}
 
 function showLoading(text) {
   hideDialogs();
@@ -38,33 +80,6 @@ function hideLoading() {
   clearInterval(spinnerInterval);
 }
 
-function showLinks(text, actions = null) {
-  hideDialogs();
-  messageText.innerHTML = text;
-  messageActions.innerHTML = "";
-  if (actions) {
-    for (const action of actions) {
-      const a = document.createElement("a");
-      a.setAttribute("href", action.href);
-      a.appendChild(document.createTextNode(action.text));
-      messageActions.appendChild(a);
-    }
-  }
-  messageContainer.classList.remove("hide");
-}
-
-function showWaitingForTurn() {
-  showLoading("Waiting for turn.");
-}
-
-function showCloseMessage(text) {
-  text = `${text}<br>Would you like to start another game?`;
-  showLinks(text, [
-    { text: "yes", href: "/game" },
-    { text: "no", href: "/" },
-  ]);
-}
-
 function hideDialogs() {
   hideMessage();
   hideLoading();
@@ -72,18 +87,6 @@ function hideDialogs() {
 
 function hideMessage() {
   messageContainer.classList.add("hide");
-}
-
-function showGame() {
-  hideDialogs();
-  resizeGame();
-  window.addEventListener("resize", resizeGame);
-  game.classList.remove("hide");
-}
-
-function hideGame() {
-  game.classList.add("hide");
-  window.removeEventListener("resize", resizeGame);
 }
 
 function resizeGame() {
@@ -99,29 +102,44 @@ function getCell(row, column) {
   return document.getElementById(`cell-${row}${column}`);
 }
 
-function updateBoard(turn) {
+function removeEventListeners(cell) {
+  cell.removeEventListener("click", onCellClick);
+  cell.removeEventListener("mouseover", onCellMouseOver);
+  cell.removeEventListener("mouseout", onCellMouseOut);
+}
+
+function addEventListeners(cell) {
+  cell.addEventListener("click", onCellClick);
+  cell.addEventListener("mouseover", onCellMouseOver);
+  cell.addEventListener("mouseout", onCellMouseOut);
+}
+
+function updateBoard() {
   for (let row = 0; row < 3; row++) {
     for (let column = 0; column < 3; column++) {
-      const piece = gameBoard[row][column];
       const cell = getCell(row, column);
-      if (piece) {
-        cell.textContent = piece;
-        cell.classList.remove("playable");
-        cell.removeEventListener("click", onCellClick);
-      } else {
-        cell.textContent = "";
-        if (turn) {
-          cell.classList.add("playable");
-          cell.addEventListener("click", onCellClick);
-        }
+      const piece = state.board[row][column];
+      cell.textContent = piece || "";
+      if (!piece && state.turn) {
+        cell.classList.add("playable");
+        addEventListeners(cell);
       }
+      else {
+        cell.classList.remove("playable");
+        removeEventListeners(cell);
+      }
+    }
+  }
+  if (state.winner) {
+    for (const [row, column] of state.winner.line) {
+      const cell = getCell(row, column);
+      cell.classList.add("highlight");
     }
   }
 }
 
 function onCellClick(event) {
-  updateBoard(false);
-  showWaitingForTurn();
+  showLoading("Waiting for turn.");
   const cell = event.target;
   cell.classList.remove("playable");
   cell.removeEventListener("click", onCellClick);
@@ -131,54 +149,39 @@ function onCellClick(event) {
   send({ action: "move", move: { row, column } });
 }
 
+function onCellMouseOver(event) {
+  const cell = event.target;
+  cell.textContent = state.piece;
+}
+
+function onCellMouseOut(event) {
+  const cell = event.target;
+  cell.textContent = "";
+}
+
 function send(command) {
   console.log(`sending to server:`, command);
   ws.send(JSON.stringify(command));
 }
 
 function updateGame(update) {
-  const { board, finished, winner, won, turn } = update;
-  gameBoard = board;
-  updateBoard(turn);
-  showGame();
-  if (finished) {
-    if (winner) {
-      if (won) {
-        showCloseMessage("You won!");
+  state = update;
+  updateBoard();
+  if (state.finished) {
+    if (state.winner) {
+      if (state.won) {
+        showMessage("You won!");
       } else {
-        showCloseMessage("You lost.");
+        showMessage("You lost.");
       }
     } else {
-      showCloseMessage("It's a draw!");
+      showMessage("It's a draw!");
     }
-  } else if (!turn) {
-    showLoading("Waiting for turn.");
+  } else {
+    if (state.turn) {
+      hideLoading();
+    } else {
+      showLoading("Waiting for turn.");
+    }
   }
 }
-
-window.addEventListener("load", () => {
-  showLoading("Waiting for opponent.");
-});
-
-ws.addEventListener("message", (event) => {
-  const command = JSON.parse(event.data);
-  console.log("received from server:", command);
-  switch (command.action) {
-    case "update":
-      updateGame(command.update);
-  }
-});
-
-ws.addEventListener("open", () => {
-  console.log("websocket connection opened");
-});
-
-ws.addEventListener("error", (error) => {
-  console.error("websocket error: ", error);
-});
-
-ws.addEventListener("close", () => {
-  console.log("websocket connection closed");
-  showCloseMessage("Lost connection to server!");
-  hideGame();
-});

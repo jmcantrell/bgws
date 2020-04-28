@@ -10,6 +10,7 @@ const game = require("./game");
 const pkg = require("./package.json");
 
 const config = require("./config");
+const logger = require("./logger");
 
 function redisClient() {
   return redis.createClient(config.REDIS_URL);
@@ -17,10 +18,10 @@ function redisClient() {
 
 function connectRedis(app) {
   app.redis = {
-    client: redisClient(),
-    subscriber: redisClient(),
+    publisher: redisClient(),
+    subscriber: redisClient()
   };
-  console.log("connected to redis");
+  logger.info("connected to redis");
 }
 
 function connectMongoDB(app) {
@@ -33,7 +34,7 @@ function connectMongoDB(app) {
         client: client,
         database: client.db(pkg.name),
       };
-      console.log("connected to mongodb");
+      logger.info("connected to mongodb");
     })
     .catch((error) => {
       console.error(error);
@@ -61,7 +62,7 @@ module.exports.start = () => {
     const server = http.createServer(app);
     game.setup(app, server);
     server.listen(config.PORT, () => {
-      console.log(`http server listening on port ${config.PORT}`);
+      logger.info(`http server listening on port ${config.PORT}`);
     });
   });
 };

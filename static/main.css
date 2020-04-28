@@ -38,6 +38,7 @@ nav {
 
 header, footer {
   background-color: #222;
+  padding: 0 1em;
 }
 
 header {

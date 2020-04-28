@@ -1,3 +1,5 @@
+const ttt = require("./ttt");
+
 class Model {
   constructor(db, collectionName) {
     this.db = db;
@@ -10,14 +12,22 @@ class Matches extends Model {
     super(db, "matches");
   }
 
-  async start(match, player2) {
-    // Complete the db record for match.
+  async start(player1) {
+    const match = ttt.createMatch();
+    player1.piece = "x";
+    match.player1 = player1;
+    match.createdOn = new Date();
+    return await this.collection.insertOne(match);
+  }
+
+  async join(match, player2) {
+    player2.piece = "o";
     const r = await this.collection.findOneAndUpdate(
       { _id: match._id },
       {
         $set: {
           player2,
-          started_on: new Date(),
+          startedOn: new Date(),
         },
       },
       { returnOriginal: false }
@@ -25,17 +35,34 @@ class Matches extends Model {
     return r.value;
   }
 
-  async queue(player1) {
-    return await this.collection.insertOne({
-      player1,
-      created_on: new Date(),
-    });
+  async addMove(match, move) {
+    const finished = ttt.addMove(match, move);
+    if (finished) match.finishedOn = new Date();
+    await this.update(match);
+    return finished;
+  }
+
+  static getPlayer(match, id) {
+    if (match.player1.id == id) return match.player1;
+    if (match.player2.id == id) return match.player2;
+    return null;
+  }
+
+  static getOpponent(match, id) {
+    if (match.player1.id == id) return match.player2;
+    if (match.player2.id == id) return match.player1;
+    return null;
+  }
+
+  static whoseTurn(match) {
+    const piece = ttt.whoseTurn(match);
+    return piece == "x" ? match.player1 : match.player2;
   }
 
   async nextAvailable() {
     const docs = await this.collection
       .find({ player2: null })
-      .sort({ created_on: 1 })
+      .sort({ createdOn: 1 })
       .limit(1)
       .toArray();
     if (docs.length == 0) return null;

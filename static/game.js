@@ -46,6 +46,8 @@ ws.addEventListener("error", (error) => {
 ws.addEventListener("close", () => {
   console.log("websocket connection closed");
   showMessage("Lost connection to server!");
+  state.turn = false;
+  updateBoard();
 });
 
 messageOkay.addEventListener("click", () => {

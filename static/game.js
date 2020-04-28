@@ -12,14 +12,16 @@ const messageContainer = document.getElementById("message");
 const messageText = document.getElementById("message-text");
 const messageOkay = document.getElementById("message-okay");
 
-let spinnerInterval;
+let state = {};
 
-let state;
+const emptyPiece = "-";
+
+let spinnerInterval;
 
 window.addEventListener("load", () => {
   showLoading("Waiting for opponent.");
-  window.addEventListener("resize", resizeGame);
-  resizeGame();
+  window.addEventListener("resize", resizeBoard);
+  updateBoard();
 });
 
 ws.addEventListener("message", (event) => {
@@ -91,7 +93,7 @@ function hideMessage() {
   messageContainer.classList.add("hide");
 }
 
-function resizeGame() {
+function resizeBoard() {
   const width = main.clientWidth;
   const height = main.clientHeight;
   const padding = 100;
@@ -116,17 +118,26 @@ function addEventListeners(cell) {
   cell.addEventListener("mouseout", onCellMouseOut);
 }
 
+function getPiece(row, column) {
+  const piece = state.board ? state.board[row][column] : emptyPiece;
+  return piece || emptyPiece;
+}
+
 function updateBoard() {
   for (let row = 0; row < 3; row++) {
     for (let column = 0; column < 3; column++) {
       const cell = getCell(row, column);
-      const piece = state.board[row][column];
-      cell.textContent = piece || "";
-      if (!piece && state.turn) {
+      const piece = getPiece(row, column);
+      cell.textContent = piece;
+      if (piece == emptyPiece) {
+        cell.classList.add("empty");
+      } else {
+        cell.classList.remove("empty");
+      }
+      if (piece == emptyPiece && state.turn) {
         cell.classList.add("playable");
         addEventListeners(cell);
-      }
-      else {
+      } else {
         cell.classList.remove("playable");
         removeEventListeners(cell);
       }
@@ -138,6 +149,7 @@ function updateBoard() {
       cell.classList.add("highlight");
     }
   }
+  resizeBoard();
 }
 
 function onCellClick(event) {
@@ -158,7 +170,7 @@ function onCellMouseOver(event) {
 
 function onCellMouseOut(event) {
   const cell = event.target;
-  cell.textContent = "";
+  cell.textContent = emptyPiece;
 }
 
 function send(command) {

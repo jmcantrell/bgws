@@ -36,8 +36,7 @@
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   grid-template-rows: repeat(3, 1fr);
-  font-size: 3em;
-  background-color: grey;
+  font-size: 4em;
   padding: 0.1em;
 }
 
@@ -50,15 +49,20 @@
   align-items: center;
   justify-content: center;
   border: 5px solid darkgrey;
-  color: white;
   background-color: black;
+  padding: 0 0.2em 0.2em 0.2em;
 }
 
 .highlight {
   background-color: red;
 }
 
+.empty {
+  color: black;
+}
+
 .playable:hover {
   cursor: pointer;
+  color: white;
   background-color: indigo;
 }

@@ -61,7 +61,7 @@ class Matches extends Model {
 
   async nextAvailable() {
     const docs = await this.collection
-      .find({ player2: null })
+      .find({ player2: null, finishedOn: null })
       .sort({ createdOn: 1 })
       .limit(1)
       .toArray();
@@ -71,12 +71,14 @@ class Matches extends Model {
 
   async findForPlayer(id) {
     return await this.collection.findOne({
+      finishedOn: null,
       $or: [{ "player1.id": id }, { "player2.id": id }],
     });
   }
 
   async deleteForPlayer(id) {
     const r = await this.collection.findOneAndDelete({
+      finishedOn: null,
       $or: [{ "player1.id": id }, { "player2.id": id }],
     });
     return r.value;

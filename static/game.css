@@ -1,7 +1,13 @@
+main {
+  display: grid;
+  justify-content: center;
+  align-items: center;
+}
+
 .overlay {
+  position: absolute;
   top: 40%;
   width: 100%;
-  position: absolute;
   display: grid;
   justify-items: center;
 }
@@ -33,11 +39,11 @@
 }
 
 #game {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  grid-template-rows: repeat(3, 1fr);
-  font-size: 4em;
   padding: 0.1em;
+  font-size: 4em;
+  display: grid;
+  grid-template-rows: repeat(3, 1fr);
+  grid-template-columns: repeat(3, 1fr);
 }
 
 .hide {
@@ -48,9 +54,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 5px solid darkgrey;
+  color: white;
   background-color: black;
   padding: 0 0.2em 0.2em 0.2em;
+  border: 5px solid darkgrey;
 }
 
 .highlight {
@@ -66,3 +73,20 @@
   color: white;
   background-color: indigo;
 }
+
+#cell-00, #cell-01, #cell-02 {
+  border-top: 0;
+}
+
+#cell-20, #cell-21, #cell-22 {
+  border-bottom: 0;
+}
+
+#cell-00, #cell-10, #cell-20 {
+  border-left: 0;
+}
+
+#cell-02, #cell-12, #cell-22 {
+  border-right: 0;
+}
+

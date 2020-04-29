@@ -1,18 +1,25 @@
 doctype html
+
 html(lang="en")
+
   head
     title= title
     meta(charset="utf-8")
     link(rel="stylesheet", href="/main.css")
+
     block links
     block scripts
+
   body
     block body
+
     header
       h1= title
+
     nav
-      block nav
+      a(href="/") home
+      a(href="/game") new game
+      a(href=homepage) source code
+
     main#main
       block main
-    footer
-      a(href=homepage) source code

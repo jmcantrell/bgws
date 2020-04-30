@@ -32,7 +32,7 @@ app.locals.pretty = true;
 app.locals.title = config.title;
 app.locals.homepage = config.homepage;
 app.use(helmet());
-app.use(express.static("static"));
+app.use(express.static("client"));
 app.use(compression());
 routes.setup(app);
 

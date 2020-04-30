@@ -4,7 +4,6 @@
   "title": "Tic-Tac-Toe with STRANGERS",
   "description": "multiplayer tic-tac-toe web application",
   "homepage": "https://github.com/jmcantrell/tttws",
-  "main": "index.js",
   "scripts": {
     "start": "node server.js",
     "start-dev": "LOG_LEVEL=trace nodemon --trace-warnings server.js",

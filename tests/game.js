@@ -8,7 +8,7 @@ const ttt = require("../ttt");
 process.env.PORT = 0;
 process.env.LOG_LEVEL = "silent";
 
-const app = require("../index.js");
+const app = require("../app");
 
 const examples = JSON.parse(
   fs.readFileSync(path.join(__dirname, "examples.json"), "utf8")

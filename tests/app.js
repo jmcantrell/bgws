@@ -5,7 +5,7 @@ const { once } = require("events");
 process.env.PORT = 0;
 process.env.LOG_LEVEL = "silent";
 
-const app = require("../index.js");
+const app = require("../app");
 
 app.get("/next", (req, res, next) => {
   next(new Error("should be caught by express"));

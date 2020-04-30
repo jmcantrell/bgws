@@ -36,11 +36,16 @@ app.use(express.static("client"));
 app.use(compression());
 routes.setup(app);
 
-app.start = async function () {
-  await connectMongoDB(this);
-  connectRedis(this);
+app.createServer = async function () {
+  await connectMongoDB(app);
+  connectRedis(app);
   const server = http.createServer(this);
   game.setup(this, server);
+  return server;
+}
+
+app.start = async function () {
+  const server = await this.createServer();
   server.listen(config.PORT, () => {
     logger.info(`http server listening on port ${config.PORT}`);
   });

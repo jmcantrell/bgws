@@ -60,8 +60,12 @@ main {
   border: 5px solid darkgrey;
 }
 
-.highlight {
-  background-color: red;
+.highlight-win {
+  background-color: darkgreen;
+}
+
+.highlight-lose {
+  background-color: darkred;
 }
 
 .empty {

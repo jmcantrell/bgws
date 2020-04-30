@@ -4,12 +4,13 @@
   "title": "Tic-Tac-Toe with STRANGERS",
   "description": "multiplayer tic-tac-toe web application",
   "homepage": "https://github.com/jmcantrell/tttws",
-  "main": "server.js",
+  "main": "index.js",
   "scripts": {
     "start": "node server.js",
-    "start-dev": "LOG_LEVEL=trace nodemon server.js",
-    "start-inspect": "LOG_LEVEL=silent node inspect server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start-dev": "LOG_LEVEL=trace nodemon --trace-warnings server.js",
+    "start-inspect": "LOG_LEVEL=silent node --trace-warnings inspect server.js",
+    "test": "nyc ava --verbose",
+    "test-dev": "ava --verbose --watch"
   },
   "keywords": [],
   "author": {
@@ -23,19 +24,22 @@
     "express": "^4.17.1",
     "helmet": "^3.22.0",
     "loglevel": "^1.6.8",
-    "mongodb": "^3.5.6",
+    "mongodb": "^3.5.7",
     "pug": "^2.0.4",
     "redis": "^3.0.2",
-    "uuid": "^7.0.3",
-    "ws": "^7.2.3"
+    "uuid": "^8.0.0",
+    "ws": "^7.2.5"
   },
   "optionalDependencies": {
     "bufferutil": "^4.0.1",
     "utf-8-validate": "^5.0.2"
   },
   "devDependencies": {
+    "ava": "^3.8.1",
     "eslint": "^6.8.0",
     "nodemon": "^2.0.3",
-    "prettier": "^2.0.5"
+    "nyc": "^15.0.1",
+    "prettier": "^2.0.5",
+    "supertest": "^4.0.2"
   }
 }

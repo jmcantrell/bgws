@@ -20,9 +20,10 @@ let spinnerInterval;
 
 window.addEventListener("load", () => {
   showLoading("Waiting for opponent.");
-  window.addEventListener("resize", resizeBoard);
   updateBoard();
 });
+
+window.addEventListener("resize", resizeBoard);
 
 ws.addEventListener("message", (event) => {
   const command = JSON.parse(event.data);
@@ -39,6 +40,7 @@ ws.addEventListener("message", (event) => {
 
 ws.addEventListener("open", () => {
   console.log("websocket connection opened");
+  send({ action: "init" });
 });
 
 ws.addEventListener("error", (error) => {
@@ -143,10 +145,13 @@ function updateBoard() {
       }
     }
   }
-  if (state.winner) {
-    for (const [row, column] of state.winner.line) {
+  const { winner, piece } = state;
+  if (winner) {
+    const outcome = winner.piece == piece ? "win" : "lose";
+    const highlight = `highlight-${outcome}`;
+    for (const [row, column] of winner.line) {
       const cell = getCell(row, column);
-      cell.classList.add("highlight");
+      cell.classList.add(highlight);
     }
   }
   resizeBoard();

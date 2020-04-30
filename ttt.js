@@ -31,6 +31,11 @@ For example:
 
 */
 
+function whoseTurn(match) {
+  const { moves } = match;
+  const move = moves[moves.length - 1];
+  return !move || move.piece == "o" ? "x" : "o";
+}
 
 function addMove(match, move) {
   const { board, moves } = match;
@@ -41,29 +46,23 @@ function addMove(match, move) {
   const wrongFirstPlayer = moves.length == 0 && piece == "o";
   const playerAlreadyMoved = moves.length > 0 && moves[turn].piece == piece;
 
-  if (wrongFirstPlayer || playerAlreadyMoved) {
-    throw new Error("player moving out of turn");
-  }
+  if (wrongFirstPlayer || playerAlreadyMoved) return false;
 
   // Disallow move if space is taken.
-  if (board[row][column]) {
-    throw new Error("player making invalid move");
-  }
+  if (board[row][column]) return false;
 
   board[row][column] = piece;
 
   const nextMove = { row, column, piece };
   moves.push(nextMove);
 
-  const winner = detectWinner(match);
-
-  if (winner) match.winner = winner;
+  match.winner = detectWinner(match);
 
   return isFinished(match);
 }
 
 function isFinished(match) {
-  return match.winner || match.moves.length == 9;
+  return Boolean(match.winner) || match.moves.length == 9;
 }
 
 function detectWinner(match) {
@@ -141,16 +140,6 @@ function detectWinner(match) {
   return null;
 }
 
-function lastMove(match) {
-  return match.moves[match.moves.length - 1];
-}
-
-function whoseTurn(match) {
-  const move = lastMove(match);
-  if (!move) return "x";
-  return move.piece == "x" ? "o" : "x";
-}
-
 function createMatch() {
   return {
     board: createBoard(),
@@ -171,9 +160,9 @@ function createBoard() {
 
 module.exports = {
   addMove,
+  createBoard,
   createMatch,
   detectWinner,
   isFinished,
-  lastMove,
   whoseTurn,
 };

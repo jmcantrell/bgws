@@ -1,4 +1,4 @@
-const ttt = require("./ttt");
+const ttt = require("./ttt")
 
 class Model {
   constructor(db, collectionName) {
@@ -12,27 +12,46 @@ class Matches extends Model {
     super(db, "matches");
   }
 
-  async start(player1) {
+  async init(player) {
+    let match = await this.start(player);
+    if (!match) {
+      return await this.create(player);
+    }
+    return match;
+  }
+
+  async create(player1) {
     const match = ttt.createMatch();
     player1.piece = "x";
     match.player1 = player1;
     match.createdOn = new Date();
-    return await this.collection.insertOne(match);
+    const r = await this.collection.insertOne(match);
+    return r.ops[0];
   }
 
-  async join(match, player2) {
+  async start(player2) {
     player2.piece = "o";
     const r = await this.collection.findOneAndUpdate(
-      { _id: match._id },
+      { player2: null, finishedOn: null },
       {
         $set: {
           player2,
           startedOn: new Date(),
         },
       },
-      { returnOriginal: false }
+      { sort: { createdOn: 1 }, returnOriginal: false }
     );
     return r.value;
+  }
+
+  static whoseTurn(match) {
+    const { player1, player2 } = match;
+    // match hasn't started
+    if (!player2) return null;
+    // match already ended
+    if (match.finishedOn) return null;
+    const piece = ttt.whoseTurn(match);
+    return piece == "x" ? player1 : player2;
   }
 
   async addMove(match, move) {
@@ -42,50 +61,23 @@ class Matches extends Model {
     return finished;
   }
 
-  static getPlayer(match, id) {
-    if (match.player1.id == id) return match.player1;
-    if (match.player2.id == id) return match.player2;
-    return null;
-  }
-
-  static getOpponent(match, id) {
-    if (match.player1.id == id) return match.player2;
-    if (match.player2.id == id) return match.player1;
-    return null;
-  }
-
-  static whoseTurn(match) {
-    const piece = ttt.whoseTurn(match);
-    return piece == "x" ? match.player1 : match.player2;
-  }
-
-  async nextAvailable() {
-    const docs = await this.collection
-      .find({ player2: null, finishedOn: null })
-      .sort({ createdOn: 1 })
-      .limit(1)
-      .toArray();
-    if (docs.length == 0) return null;
-    return docs[0];
-  }
-
-  async findForPlayer(id) {
-    return await this.collection.findOne({
-      finishedOn: null,
-      $or: [{ "player1.id": id }, { "player2.id": id }],
-    });
-  }
-
-  async deleteForPlayer(id) {
-    const r = await this.collection.findOneAndDelete({
-      finishedOn: null,
-      $or: [{ "player1.id": id }, { "player2.id": id }],
-    });
-    return r.value;
-  }
-
   async update(match) {
     return await this.collection.replaceOne({ _id: match._id }, match);
+  }
+
+  async findForPlayer(player) {
+    return await this.collection.findOne({
+      finishedOn: null,
+      $or: [{ "player1.id": player.id }, { "player2.id": player.id }],
+    });
+  }
+
+  async deleteForPlayer(player) {
+    const r = await this.collection.findOneAndDelete({
+      finishedOn: null,
+      $or: [{ "player1.id": player.id }, { "player2.id": player.id }],
+    });
+    return r.value;
   }
 }
 

@@ -1,0 +1,56 @@
+{
+  "x wins": {
+    "board": [["x","x","x"],["o","o",null],[null,null,null]],
+    "moves": [
+      { "piece": "x", "row": 0, "column": 0 },
+      { "piece": "o", "row": 1, "column": 0 },
+      { "piece": "x", "row": 0, "column": 1 },
+      { "piece": "o", "row": 1, "column": 1 },
+      { "piece": "x", "row": 0, "column": 2 }
+    ],
+    "winner": {
+      "line": [
+        [0, 0],
+        [0, 1],
+        [0, 2]
+      ],
+      "piece": "x"
+    }
+  },
+
+  "o wins": {
+    "board": [["x","x",null],["o","o","o"],["x",null,null]],
+    "moves": [
+      { "piece": "x", "row": 0, "column": 0 },
+      { "piece": "o", "row": 1, "column": 0 },
+      { "piece": "x", "row": 0, "column": 1 },
+      { "piece": "o", "row": 1, "column": 1 },
+      { "piece": "x", "row": 2, "column": 0 },
+      { "piece": "o", "row": 1, "column": 2 }
+    ],
+    "winner": {
+      "line": [
+        [1, 0],
+        [1, 1],
+        [1, 2]
+      ],
+      "piece": "o"
+    }
+  },
+
+  "draw": {
+    "board": [["x","x","o"],["o","o","x"],["x","x","o"]],
+    "moves": [
+      { "piece": "x", "row": 0, "column": 0 },
+      { "piece": "o", "row": 2, "column": 2 },
+      { "piece": "x", "row": 1, "column": 2 },
+      { "piece": "o", "row": 0, "column": 2 },
+      { "piece": "x", "row": 2, "column": 1 },
+      { "piece": "o", "row": 1, "column": 1 },
+      { "piece": "x", "row": 0, "column": 1 },
+      { "piece": "o", "row": 1, "column": 0 },
+      { "piece": "x", "row": 2, "column": 0 }
+    ],
+    "winner": null
+  }
+}

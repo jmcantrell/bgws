@@ -1,1 +1,3 @@
-require("./app").start();
+const app = require("./index");
+
+app.start();

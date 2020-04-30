@@ -1,5 +1,4 @@
 module.exports.setup = (app) => {
-
   app.get("/", (req, res) => {
     return res.render("index");
   });
@@ -7,5 +6,4 @@ module.exports.setup = (app) => {
   app.get("/game", (req, res) => {
     return res.render("game");
   });
-
 };

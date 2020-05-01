@@ -23,6 +23,10 @@ test.beforeEach(async (t) => {
   t.context.player2 = { id: 2 };
 });
 
+test.afterEach.always(async (t) => {
+  await t.context.db.dropDatabase();
+});
+
 for (const [name, match] of Object.entries(examples)) {
   test(`match: ${name}`, async (t) => {
     await testMatch(t, match);
@@ -107,8 +111,4 @@ test("Matches.whoseTurn()", async (t) => {
   t.is(Matches.whoseTurn(match2), match2.player2);
   await matches.addMove(match2, { piece: "o", row: 1, column: 1 });
   t.is(Matches.whoseTurn(match2), match2.player1);
-});
-
-test.afterEach.always(async (t) => {
-  await t.context.db.dropDatabase();
 });

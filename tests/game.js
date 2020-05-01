@@ -7,6 +7,7 @@ const ttt = require("../ttt");
 
 process.env.PORT = 0;
 process.env.LOG_LEVEL = "silent";
+process.env.MONGODB_URI = "mongodb://localhost:27017/tttws-test";
 
 const app = require("../app");
 

@@ -93,10 +93,12 @@ module.exports.setup = function (app, server) {
       logger.info(`closing match for player ${id}`);
       const { player1, player2 } = match;
       const opponent = id == player1.id ? player2 : player1;
-      publish(opponent, {
-        action: "close",
-        reason: "Opponent left the game.",
-      });
+      if (opponent) {
+        publish(opponent, {
+          action: "close",
+          reason: "Opponent left the game.",
+        });
+      }
     }
     removePlayer(id);
   }

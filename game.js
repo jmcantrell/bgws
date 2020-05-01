@@ -81,14 +81,16 @@ module.exports.setup = function (app, server) {
   // Cleanup any references to a given player.
   function removePlayer(id) {
     const ws = connections.get(id);
-    if (ws) ws.close();
-    connections.delete(id);
+    if (ws) {
+      ws.close();
+      connections.delete(id);
+    }
   }
 
   async function closeMatch(id) {
-    logger.info(`closing match for player ${id}`);
     const match = await matches.deleteForPlayer({ id });
     if (match) {
+      logger.info(`closing match for player ${id}`);
       const { player1, player2 } = match;
       const opponent = id == player1.id ? player2 : player1;
       publish(opponent, {

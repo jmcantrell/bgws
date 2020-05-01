@@ -28,7 +28,7 @@ test.afterEach.always(async (t) => {
 });
 
 for (const [name, match] of Object.entries(examples)) {
-  test(`match: ${name}`, async (t) => {
+  test.serial(`match: ${name}`, async (t) => {
     await testMatch(t, match);
   });
 }

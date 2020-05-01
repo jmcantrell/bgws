@@ -42,7 +42,7 @@ app.createServer = async function () {
   const server = http.createServer(this);
   game.setup(this, server);
   return server;
-}
+};
 
 app.start = async function () {
   const server = await this.createServer();

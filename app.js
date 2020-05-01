@@ -20,7 +20,7 @@ function connectMongoDB(app) {
   return config.connectMongoDB().then((client) => {
     app.mongodb = {
       client: client,
-      database: client.db(config.name),
+      database: client.db()
     };
     logger.info("connected to mongodb");
   });

@@ -12,17 +12,12 @@ const messageContainer = document.getElementById("message");
 const messageText = document.getElementById("message-text");
 const messageOkay = document.getElementById("message-okay");
 
-let state = {};
-
+let state = null;
 const emptyPiece = "-";
 
 let spinnerInterval;
 
-window.addEventListener("load", () => {
-  showLoading("Waiting for opponent.");
-  updateBoard();
-});
-
+window.addEventListener("load", resizeBoard);
 window.addEventListener("resize", resizeBoard);
 
 ws.addEventListener("message", (event) => {
@@ -30,17 +25,20 @@ ws.addEventListener("message", (event) => {
   console.log("received from server:", command);
   switch (command.action) {
     case "update":
-      updateGame(command.update);
+      updateGame(command.state);
       break;
-    case "close":
+    case "end":
       showMessage(command.reason);
+      state.turn = false;
+      updateBoard();
       break;
   }
 });
 
 ws.addEventListener("open", () => {
   console.log("websocket connection opened");
-  send({ action: "init" });
+  send({ action: "join", game: "ttt" });
+  showLoading("Waiting for opponent.");
 });
 
 ws.addEventListener("error", (error) => {
@@ -54,7 +52,8 @@ ws.addEventListener("close", () => {
   updateBoard();
 });
 
-messageOkay.addEventListener("click", () => {
+messageOkay.addEventListener("click", (event) => {
+  event.preventDefault();
   hideMessage();
 });
 
@@ -121,7 +120,7 @@ function addEventListeners(cell) {
 }
 
 function getPiece(row, column) {
-  const piece = state.board ? state.board[row][column] : emptyPiece;
+  const piece = state ? state.board[row][column] : null;
   return piece || emptyPiece;
 }
 
@@ -145,19 +144,20 @@ function updateBoard() {
       }
     }
   }
-  const { winner, piece } = state;
-  if (winner) {
-    const outcome = winner.piece == piece ? "win" : "lose";
-    const highlight = `highlight-${outcome}`;
-    for (const [row, column] of winner.line) {
-      const cell = getCell(row, column);
-      cell.classList.add(highlight);
-    }
-  }
   resizeBoard();
 }
 
+function updateWinner(winner) {
+  const outcome = winner.piece == state.piece ? "win" : "lose";
+  const highlight = `highlight-${outcome}`;
+  for (const [row, column] of winner.line) {
+    const cell = getCell(row, column);
+    cell.classList.add(highlight);
+  }
+}
+
 function onCellClick(event) {
+  event.preventDefault();
   showLoading("Waiting for turn.");
   const cell = event.target;
   cell.classList.remove("playable");
@@ -183,21 +183,22 @@ function send(command) {
   ws.send(JSON.stringify(command));
 }
 
-function updateGame(update) {
-  state = update;
+function updateGame(newState) {
+  state = newState;
+
+  const { finished, winner, turn, won } = state;
+
   updateBoard();
-  if (state.finished) {
-    if (state.winner) {
-      if (state.won) {
-        showMessage("You won!");
-      } else {
-        showMessage("You lost.");
-      }
+
+  if (finished) {
+    if (winner) {
+      updateWinner(winner);
+      showMessage(won ? "You won!" : "You lost.");
     } else {
       showMessage("It's a draw!");
     }
   } else {
-    if (state.turn) {
+    if (turn) {
       hideLoading();
     } else {
       showLoading("Waiting for turn.");

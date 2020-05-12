@@ -1,25 +1,13 @@
-extends layout.pug
+extends layout
 
 block links
-  link(rel="stylesheet", href="/game.css")
+  link(rel="stylesheet", href="index.css")
 
 block scripts
-  script(defer, src="/game.js")
+  script(defer, src="index.js")
 
-block body
-  div.overlay
-
-    div.hide.dialog#message
-      div#message-text
-      div#message-actions
-        a#message-okay(href="#") okay
-
-    div.hide.dialog#loading
-      div#loading-text
-      div#loading-spinner
-
-block main
-  div#game
-    each row in [0, 1, 2]
-      each col in [0, 1, 2]
-        div.cell(id=`cell-${row}${col}`)
+block nav
+  a(href="/") home
+  a(href="/games/") games
+  a(href=`/games/${id}/`) new game
+  a(href=`${homepage}/lib/games/${id}.js`) source code

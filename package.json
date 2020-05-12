@@ -1,15 +1,14 @@
 {
-  "name": "tttws",
+  "name": "gws",
   "version": "1.0.0",
-  "title": "Tic-Tac-Toe with STRANGERS",
-  "description": "multiplayer tic-tac-toe web application",
-  "homepage": "https://github.com/jmcantrell/tttws",
+  "title": "Games with STRANGERS",
+  "description": "multiplayer anonymous game server",
+  "homepage": "https://github.com/jmcantrell/gws",
   "scripts": {
-    "start": "node server.js",
-    "start-dev": "LOG_LEVEL=trace nodemon --trace-warnings server.js",
-    "start-inspect": "LOG_LEVEL=silent node --trace-warnings inspect server.js",
-    "test": "nyc ava --verbose",
-    "test-dev": "ava --verbose --watch"
+    "start": "nf start",
+    "start-dev": "nf -j Procfile.development start",
+    "test": "nyc ava -sv",
+    "test-dev": "ava -svw"
   },
   "keywords": [],
   "author": {
@@ -21,11 +20,13 @@
   "dependencies": {
     "compression": "^1.7.4",
     "express": "^4.17.1",
+    "glob": "^7.1.6",
     "helmet": "^3.22.0",
-    "loglevel": "^1.6.8",
-    "mongodb": "^3.5.7",
+    "pino": "^6.2.1",
+    "pino-http": "^5.1.0",
     "pug": "^2.0.4",
     "redis": "^3.0.2",
+    "throng": "^4.0.0",
     "uuid": "^8.0.0",
     "ws": "^7.2.5"
   },
@@ -34,12 +35,13 @@
     "utf-8-validate": "^5.0.2"
   },
   "devDependencies": {
-    "ava": "^3.8.1",
-    "eslint": "^6.8.0",
-    "got": "^11.0.3",
+    "ava": "^3.8.2",
+    "foreman": "^3.0.1",
+    "got": "^11.1.2",
     "jsdom": "^16.2.2",
     "nodemon": "^2.0.3",
     "nyc": "^15.0.1",
-    "prettier": "^2.0.5"
+    "pino-pretty": "^4.0.0",
+    "redis-mock": "^0.49.0"
   }
 }

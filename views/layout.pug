@@ -3,7 +3,11 @@ doctype html
 html(lang="en")
 
   head
-    title= title
+    if name
+      title= `${title}: ${name}`
+    else
+      title= title
+
     meta(charset="utf-8")
     link(rel="stylesheet", href="/main.css")
 
@@ -14,12 +18,13 @@ html(lang="en")
     block body
 
     header
-      h1= title
+      if name
+        h1= name
+      else
+        h1= title
 
     nav
-      a(href="/") home
-      a(href="/game") new game
-      a(href=homepage) source code
+      block nav
 
     main#main
       block main

@@ -1,0 +1,2 @@
+web: nodemon --trace-warnings web.js | pino-pretty -tc
+lobby: nodemon --trace-warnings lobby.js | pino-pretty -tc

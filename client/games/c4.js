@@ -2,6 +2,7 @@ import Game from "/game.js";
 
 const COLUMNS = 7;
 const ROWS = 6;
+const COLORS = ["gold", "darkred"];
 
 class ConnectFour extends Game {
   constructor() {
@@ -12,22 +13,23 @@ class ConnectFour extends Game {
 
     this.elements.container.addEventListener("mousemove", (event) => {
       if (!this.state || !this.state.turn) return;
-      const column = this.getColumn(event.offsetX, event.offsetY);
-      this.drawHints(column);
+      const space = this.getSpace(event.offsetX, event.offsetY);
+      this.drawIndicator(space);
     });
 
     this.elements.container.addEventListener("click", (event) => {
       if (!this.state || !this.state.turn) return;
-      const column = this.getColumn(event.offsetX, event.offsetY);
-      if (column === null) return;
-      const cell = this.getEmptyCell(column);
-      if (cell === null) return;
+      const space = this.getSpace(event.offsetX, event.offsetY);
+      if (!space) return;
+      const cell = this.getEmptyCell(space.column);
+      if (!cell) return;
+      const { column, row } = cell;
       this.showLoading("Waiting for turn.");
-      this.state.board[cell.column][cell.row] = this.state.piece;
+      this.state.board[column][row] = this.state.player;
       this.state.turn = false;
       this.drawPieces();
-      this.drawHints();
-      this.send({ action: "move", move: { column } });
+      this.drawIndicator();
+      this.send({ action: "move", move: { column, row } });
     });
 
     this.draw();
@@ -61,7 +63,7 @@ class ConnectFour extends Game {
     const min = Math.min(width, height);
 
     const m = Math.trunc(min * 0.05);
-    const margin = { top: m, bottom: 0, left: m, right: m };
+    const margin = { top: m, bottom: m, left: m, right: m };
 
     const aspectRatio = { width: COLUMNS, height: ROWS };
 
@@ -113,13 +115,15 @@ class ConnectFour extends Game {
     };
   }
 
-  getColumn(x, y) {
+  getSpace(x, y) {
     const { cellSize, grid } = this.properties;
     const { left, top } = grid;
     const right = left + grid.width;
     const bottom = top + grid.height;
     if (x > left && x < right && y > top && y < bottom) {
-      return Math.trunc((x - left) / cellSize);
+      const row = Math.trunc((y - top) / cellSize);
+      const column = Math.trunc((x - left) / cellSize);
+      return { row, column };
     }
     return null;
   }
@@ -136,10 +140,10 @@ class ConnectFour extends Game {
     const { cells, cellSize } = this.properties;
     for (let column = 0; column < COLUMNS; column++) {
       for (let row = 0; row < ROWS; row++) {
-        const piece = this.state.board[column][row];
-        if (piece) {
+        const player = this.state.board[column][row];
+        if (player !== null) {
           const cell = cells[column][row];
-          context.fillStyle = piece;
+          context.fillStyle = COLORS[player];
           context.fillRect(cell.left, cell.top, cellSize, cellSize);
         }
       }
@@ -153,7 +157,7 @@ class ConnectFour extends Game {
 
     context.globalCompositeOperation = "xor";
 
-    context.fillStyle = "blue";
+    context.fillStyle = "darkblue";
     context.fillRect(frame.left, frame.top, frame.width, frame.height);
 
     context.fillStyle = "white";
@@ -174,19 +178,24 @@ class ConnectFour extends Game {
     }
   }
 
-  drawHints(column = null) {
-    const { hints } = this.elements;
-    const context = hints.getContext("2d");
-    Game.clearCanvas(hints, context);
-    if (this.state.turn && column !== null) {
-      this.drawIndicator(context, column);
-    }
-  }
+  drawIndicator(space = null) {
+    const canvas = this.elements.hints;
+    const context = canvas.getContext("2d");
+    Game.clearCanvas(canvas, context);
 
-  drawIndicator(context, column) {
+    const { turn, board } = this.state;
+
+    if (!turn || !space) return;
+
+    const { row, column } = space;
+
+    if (board[column][row] != null) return;
+
+    const cell = this.getEmptyCell(space.column);
+
+    if (!cell) return;
+
     const { pieceRadius, cellSize, grid } = this.properties;
-
-    const cell = this.getEmptyCell(column);
 
     context.strokeStyle = "white";
     context.lineWidth = Math.trunc(cellSize * 0.08);
@@ -204,7 +213,7 @@ class ConnectFour extends Game {
     context.stroke();
     context.closePath();
 
-    context.fillStyle = this.state.piece;
+    context.fillStyle = COLORS[this.state.player];
     context.beginPath();
     context.ellipse(
       cell.cx,

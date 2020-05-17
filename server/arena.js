@@ -74,7 +74,6 @@ class Arena extends EventEmitter {
       const player = players[i];
       player.index = i;
       player.match = match.id;
-      player.piece = game.pieces[i];
       match.players.push(player.id);
       await this.savePlayer(player);
     }
@@ -139,7 +138,7 @@ class Arena extends EventEmitter {
   async updatePlayers(game, match, players) {
     await Promise.all(
       players.map((player) => {
-        const state = game.getState(match, player.piece);
+        const state = game.getState(match, player);
         return this.send(player, { action: "update", state });
       })
     );

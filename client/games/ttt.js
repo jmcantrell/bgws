@@ -23,7 +23,7 @@ class TicTacToe extends Game {
       const { row, column } = space;
       if (this.state.board[row][column]) return;
       this.showLoading("Waiting for turn.");
-      this.state.board[row][column] = this.state.piece;
+      this.state.board[row][column] = this.state.player;
       this.state.turn = false;
       this.drawPieces();
       this.drawIndicator();
@@ -61,7 +61,7 @@ class TicTacToe extends Game {
     const min = Math.min(width, height);
 
     const m = Math.trunc(min * 0.05);
-    const margin = { top: m, bottom: 0, left: m, right: m };
+    const margin = { top: m, bottom: m, left: m, right: m };
 
     const aspectRatio = { width: COLUMNS, height: ROWS };
 
@@ -148,10 +148,10 @@ class TicTacToe extends Game {
     const { cells } = this.properties;
     for (let row = 0; row < ROWS; row++) {
       for (let column = 0; column < COLUMNS; column++) {
-        const piece = this.state.board[row][column];
-        if (piece) {
+        const player = this.state.board[row][column];
+        if (player !== null) {
           const cell = cells[row][column];
-          this.drawPiece(context, piece, cell.cx, cell.cy);
+          this.drawPiece(context, player, cell.cx, cell.cy);
         }
       }
     }
@@ -159,13 +159,13 @@ class TicTacToe extends Game {
 
   drawWinner() {
     const { hints } = this.elements;
-    const { winner, piece } = this.state;
+    const { winner, player } = this.state;
     const { cellSize, cells } = this.properties;
 
     const context = hints.getContext("2d");
     Game.clearCanvas(hints, context);
 
-    context.fillStyle = winner.piece == piece ? "darkgreen" : "darkred";
+    context.fillStyle = winner.player == player ? "darkgreen" : "darkred";
     for (const space of winner.line) {
       const cell = cells[space.row][space.column];
       context.fillRect(cell.left, cell.top, cellSize, cellSize);
@@ -173,29 +173,32 @@ class TicTacToe extends Game {
   }
 
   drawIndicator(space = null) {
-    const { hints } = this.elements;
-    const context = hints.getContext("2d");
-    Game.clearCanvas(hints, context);
+    const canvas = this.elements.hints;
+    const context = canvas.getContext("2d");
+    Game.clearCanvas(canvas, context);
 
-    if (this.state.turn && space) {
-      if (!this.state.board[space.row][space.column]) {
-        const { cellSize, cells } = this.properties;
-        const cell = cells[space.row][space.column];
+    if (!this.state.turn || !space) return;
 
-        context.fillStyle = "indigo";
-        context.fillRect(cell.left, cell.top, cellSize, cellSize);
+    const { row, column } = space;
+    const { player, board } = this.state;
 
-        this.drawPiece(context, this.state.piece, cell.cx, cell.cy);
-      }
-    }
+    if (board[row][column] !== null) return;
+
+    const { cellSize, cells } = this.properties;
+    const cell = cells[row][column];
+
+    context.fillStyle = "indigo";
+    context.fillRect(cell.left, cell.top, cellSize, cellSize);
+
+    this.drawPiece(context, player, cell.cx, cell.cy);
   }
 
-  drawPiece(context, piece, x, y) {
-    switch (piece) {
-      case "x":
+  drawPiece(context, player, x, y) {
+    switch (player) {
+      case 0:
         this.drawX(context, x, y);
         break;
-      case "o":
+      case 1:
         this.drawO(context, x, y);
         break;
     }

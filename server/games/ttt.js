@@ -1,168 +1,137 @@
-const numPlayers = 2;
-const name = "Tic-Tac-Toe";
-const pieces = ["x", "o"];
+const Game = require("../game");
 
-module.exports = {
-  name,
-  pieces,
-  numPlayers,
-  createMatch,
-  getState,
-  command,
-};
+class TicTacToe extends Game {
+  constructor() {
+    super("ttt", "Tic-Tac-Toe", 2);
+  }
 
-function createMatch() {
-  return {
-    moves: [],
-    next: pieces[0],
-    board: createBoard(),
-  };
-}
-
-function createBoard() {
-  const board = [];
-  for (let row = 0; row < 3; row++) {
-    board.push([]);
-    for (let column = 0; column < 3; column++) {
-      board[row].push(null);
+  createBoard() {
+    const board = [];
+    for (let row = 0; row < 3; row++) {
+      board.push([]);
+      for (let column = 0; column < 3; column++) {
+        board[row].push(null);
+      }
     }
-  }
-  return board;
-}
-
-function getState(match, piece) {
-  const { board, finished, winner } = match;
-  const update = { piece, board, finished, winner };
-  update.turn = finished ? null : match.next == piece;
-  update.won = winner ? winner.piece == piece : null;
-  return update;
-}
-
-function command(match, player, command) {
-  switch (command.action) {
-    case "move":
-      return addMove(match, player.piece, command.move);
-    default:
-      throw new Error("invalid command");
-  }
-}
-
-function addMove(match, piece, move) {
-  const { row, column } = move;
-  const { moves, board } = match;
-
-  if (match.finished) {
-    throw new Error("match already finished");
+    return board;
   }
 
-  const i = pieces.indexOf(piece);
+  addMove(match, player, move) {
+    const { board, moves } = match;
 
-  if (moves.length == 0 && i > 0) {
-    throw new Error("only player one can move first");
-  }
-
-  // Disallow move if same player previously moved
-  if (moves.length > 0) {
-    const last = moves[moves.length - 1];
-    if (last.piece == piece) {
-      throw new Error("player already moved");
+    if (match.finished) {
+      throw new Error("match already finished");
     }
-  }
 
-  // Disallow move if space already occupied
-  if (board[row][column]) {
-    throw new Error("space already occupied");
-  }
-
-  board[row][column] = piece;
-
-  move.piece = piece;
-  moves.push(move);
-
-  match.winner = getWinner(match);
-  match.finished = Boolean(match.winner) || isFinished(match);
-
-  const next = pieces[(i + 1) % pieces.length];
-  match.next = match.finished ? null : next;
-}
-
-function isFinished(match) {
-  return match.moves.length == 9;
-}
-
-function getWinner(match) {
-  const { board } = match;
-
-  function cell({ row, column }) {
-    return board[row][column];
-  }
-
-  function same([c1, c2, c3]) {
-    const a = cell(c1);
-    const b = cell(c2);
-    const c = cell(c3);
-    return a && a == b && b == c;
-  }
-
-  const lines = [
-    [
-      // row 1
-      { row: 0, column: 0 },
-      { row: 0, column: 1 },
-      { row: 0, column: 2 },
-    ],
-    [
-      // row 2
-      { row: 1, column: 0 },
-      { row: 1, column: 1 },
-      { row: 1, column: 2 },
-    ],
-    [
-      // row 3
-      { row: 2, column: 0 },
-      { row: 2, column: 1 },
-      { row: 2, column: 2 },
-    ],
-    [
-      // column 1
-      { row: 0, column: 0 },
-      { row: 1, column: 0 },
-      { row: 2, column: 0 },
-    ],
-    [
-      // column 2
-      { row: 0, column: 1 },
-      { row: 1, column: 1 },
-      { row: 2, column: 1 },
-    ],
-    [
-      // column 3
-      { row: 0, column: 2 },
-      { row: 1, column: 2 },
-      { row: 2, column: 2 },
-    ],
-    [
-      // diagonal 1
-      { row: 0, column: 0 },
-      { row: 1, column: 1 },
-      { row: 2, column: 2 },
-    ],
-    [
-      // diagonal 2
-      { row: 0, column: 2 },
-      { row: 1, column: 1 },
-      { row: 2, column: 0 },
-    ],
-  ];
-
-  for (const line of lines) {
-    if (same(line)) {
-      return {
-        line,
-        piece: board[line[0].row][line[0].column],
-      };
+    if (moves.length == 0 && player.index > 0) {
+      throw new Error("only player one can move first");
     }
+
+    if (moves.length > 0) {
+      const last = moves[moves.length - 1];
+      if (last.player == player.index) {
+        throw new Error("player already moved");
+      }
+    }
+
+    const { row, column } = move;
+
+    if (board[row][column] !== null) {
+      throw new Error("space already occupied");
+    }
+
+    board[row][column] = player.index;
+
+    move.player = player.index;
+    moves.push(move);
+
+    match.winner = this.getWinner(match);
+    match.finished = Boolean(match.winner) || this.isDraw(match);
+
+    const next = (player.index + 1) % this.numPlayers;
+    match.next = match.finished ? null : next;
   }
 
-  return null;
+  isDraw(match) {
+    return match.moves.length == 9;
+  }
+
+  getWinner(match) {
+    const { board } = match;
+
+    function cell({ row, column }) {
+      return board[row][column];
+    }
+
+    function same([c1, c2, c3]) {
+      const a = cell(c1);
+      const b = cell(c2);
+      const c = cell(c3);
+      return a !== null && a === b && b === c;
+    }
+
+    const lines = [
+      [
+        // row 1
+        { row: 0, column: 0 },
+        { row: 0, column: 1 },
+        { row: 0, column: 2 },
+      ],
+      [
+        // row 2
+        { row: 1, column: 0 },
+        { row: 1, column: 1 },
+        { row: 1, column: 2 },
+      ],
+      [
+        // row 3
+        { row: 2, column: 0 },
+        { row: 2, column: 1 },
+        { row: 2, column: 2 },
+      ],
+      [
+        // column 1
+        { row: 0, column: 0 },
+        { row: 1, column: 0 },
+        { row: 2, column: 0 },
+      ],
+      [
+        // column 2
+        { row: 0, column: 1 },
+        { row: 1, column: 1 },
+        { row: 2, column: 1 },
+      ],
+      [
+        // column 3
+        { row: 0, column: 2 },
+        { row: 1, column: 2 },
+        { row: 2, column: 2 },
+      ],
+      [
+        // diagonal 1
+        { row: 0, column: 0 },
+        { row: 1, column: 1 },
+        { row: 2, column: 2 },
+      ],
+      [
+        // diagonal 2
+        { row: 0, column: 2 },
+        { row: 1, column: 1 },
+        { row: 2, column: 0 },
+      ],
+    ];
+
+    for (const line of lines) {
+      if (same(line)) {
+        return {
+          line,
+          player: board[line[0].row][line[0].column],
+        };
+      }
+    }
+
+    return null;
+  }
 }
+
+module.exports = TicTacToe;

@@ -1,5 +1,5 @@
 const test = require("ava");
-const games = require("../../lib/games");
+const games = require("../../server/games");
 const server = require("../_server");
 
 test.beforeEach(async (t) => {
@@ -48,5 +48,9 @@ for (const id of games.keys()) {
     const loadingSpinner = document.getElementById("loading-spinner");
     t.truthy(loadingSpinner);
     t.true(loading.contains(loadingSpinner));
+
+    // there is a container for the canvases
+    const container = document.getElementById("container");
+    t.truthy(container);
   });
 }

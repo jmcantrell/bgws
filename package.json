@@ -2,11 +2,12 @@
   "name": "gws",
   "version": "1.0.0",
   "title": "Games with STRANGERS",
-  "description": "multiplayer anonymous game server",
+  "description": "multiplayer board game server",
   "homepage": "https://github.com/jmcantrell/gws",
   "scripts": {
-    "start": "nf start",
-    "start-dev": "nf -j Procfile.development start",
+    "start": "concurrently 'npm:start-*'",
+    "start-web": "nodemon -w server web.js | pino-pretty -tc",
+    "start-lobby": "nodemon -w server lobby.js | pino-pretty -tc",
     "test": "nyc ava -sv",
     "test-dev": "ava -svw"
   },
@@ -36,7 +37,7 @@
   },
   "devDependencies": {
     "ava": "^3.8.2",
-    "foreman": "^3.0.1",
+    "concurrently": "^5.2.0",
     "got": "^11.1.2",
     "jsdom": "^16.2.2",
     "nodemon": "^2.0.3",

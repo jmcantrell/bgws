@@ -9,7 +9,7 @@ process.on("warning", (e) => console.warn(e.stack));
 process.env.PORT = 0;
 process.env.LOG_LEVEL = "silent";
 
-const app = require("../app");
+const app = require("../server/app");
 
 function send(ws, message) {
   ws.send(JSON.stringify(message));

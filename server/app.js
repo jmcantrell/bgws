@@ -7,9 +7,9 @@ const pino = require("pino");
 const pinoHttp = require("pino-http");
 const redis = require("redis");
 
-const Arena = require("./lib/arena");
-const Switch = require("./lib/switch");
-const games = require("./lib/games");
+const Arena = require("./arena");
+const Switch = require("./switch");
+const games = require("./games");
 
 const logLevel = process.env.LOG_LEVEL || "info";
 const logger = pino({ level: logLevel });
@@ -26,7 +26,7 @@ app.locals.homepage = pkg.homepage;
 
 app.use(helmet());
 app.use(compression());
-app.use(pinoHttp({ logger }));
+// app.use(pinoHttp({ logger }));
 app.use(express.static("client"));
 
 app.get("/", (req, res) => {
@@ -44,7 +44,7 @@ app.get("/games/", (req, res) => {
 app.get("/games/:id/", (req, res) => {
   const { id } = req.params;
   const { name } = games.get(id);
-  return res.render(`games/${id}`, { id, name });
+  return res.render("game", { id, name });
 });
 
 app.use((req, res) => {

@@ -1,5 +1,5 @@
 const test = require("ava");
-const games = require("../lib/games");
+const games = require("../server/games");
 const server = require("./_server");
 
 test.beforeEach(async (t) => {

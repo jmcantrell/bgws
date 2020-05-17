@@ -37,10 +37,11 @@ class Switch extends EventEmitter {
         const data = JSON.parse(message);
         this.emit("data", id, data);
         try {
-          if (data.action == "join") {
-            await this.arena.join(id, data.game, this.channel);
-          } else {
-            await this.arena.command(id, data);
+          switch (data.action) {
+            case "join":
+              return await this.arena.join(id, data.game, this.channel);
+            default:
+              return await this.arena.command(id, data);
           }
         } catch (err) {
           this.emit("error", err);
@@ -81,10 +82,7 @@ class Switch extends EventEmitter {
 
   send(id, data) {
     const ws = this.clients.get(id);
-    if (ws) {
-      ws.send(JSON.stringify(data));
-    } else {
-    }
+    if (ws) ws.send(JSON.stringify(data));
   }
 }
 

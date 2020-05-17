@@ -1,1 +1,1 @@
-require("./app").startLobby();
+require("./server/app").startLobby();

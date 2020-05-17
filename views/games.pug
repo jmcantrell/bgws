@@ -1,9 +1,4 @@
-extends layout
-
-block nav
-  a(href="/") home
-  a(href="/games/") games
-  a(href=`${homepage}/lib/games/`) source code
+extends base
 
 block main
   each game in games

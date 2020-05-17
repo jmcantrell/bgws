@@ -1,16 +1,11 @@
-html, body {
-  margin: 0;
-  width: 100%;
-  height: 100%;
-}
-
 body {
-  background-color: black;
+  margin: 0;
+  height: 100vh;
   display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  background-color: black;
   font-family: monospace;
   font-size: 2em;
-  grid-template-rows: auto auto 1fr auto;
-  min-height: 100%;
   text-align: center;
 }
 
@@ -22,8 +17,9 @@ a:hover {
   color: white;
 }
 
-main {
-  padding: 1em;
+header {
+  color: white;
+  margin: 0 1em;
 }
 
 nav {
@@ -33,10 +29,10 @@ nav {
   background-color: darkslategrey;
 }
 
-header, footer {
-  padding: 0 1em;
+main {
+  margin: 1em;
 }
 
-header {
-  color: white;
+footer {
+  margin: 1em;
 }

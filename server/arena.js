@@ -20,42 +20,68 @@ class Arena extends EventEmitter {
 
   async listen() {
     setImmediate(async () => {
+      await this.sortNextPlayer();
+      await this.listen();
+    });
+  }
+
+  async sortNextPlayer() {
+    try {
       const res = await this.brpop("joined", 0);
       const playerID = res[1];
       const player = await this.getPlayer(playerID);
-      if (player) {
-        const game = games.get(player.game);
-        const waiting = `waiting:${player.game}`;
-        const count = await this.llen(waiting);
-        if (count >= game.numPlayers - 1) {
-          const playerIDs = [];
-          for (let i = 0; i < game.numPlayers - 1; i++) {
-            playerIDs.push(await this.rpop(waiting));
-          }
-          const players = await this.getPlayers(playerIDs);
-          players.push(player);
-          const match = game.createMatch();
-          match.id = uuid.v4();
-          match.game = player.game;
-          match.start = Date.now();
-          match.players = [];
-          for (let i = 0; i < players.length; i++) {
-            const player = players[i];
-            player.index = i;
-            player.match = match.id;
-            player.piece = game.pieces[i];
-            match.players.push(player.id);
-            await this.savePlayer(player);
-          }
-          this.emit("match", player.game, match.id, match.players);
-          await this.saveMatch(match);
-          await this.updatePlayers(game, match, players);
-        } else {
-          await this.lpush(waiting, playerID);
+      const waiting = `waiting:${player.game}`;
+      await this.lpush(waiting, playerID);
+      await this.checkWaiting(player.game);
+    } catch (err) {
+      this.emit("error", err);
+    }
+  }
+
+  async checkWaiting(gameID) {
+    const game = games.get(gameID);
+    const waiting = `waiting:${gameID}`;
+    const count = await this.llen(waiting);
+    if (count >= game.numPlayers) {
+      const playerIDs = [];
+      for (let i = 0; i < game.numPlayers; i++) {
+        playerIDs.push(await this.rpop(waiting));
+      }
+      const players = await this.getPlayers(playerIDs);
+      await this.createMatch(game, players);
+    }
+  }
+
+  async createMatch(game, players) {
+    const match = game.createMatch();
+    match.id = uuid.v4();
+    match.game = game.id;
+    match.start = Date.now();
+    match.players = [];
+
+    // If any players disconnected before this point, their player data
+    // will be missing, so re-queue the other players;
+    if (players.includes(null)) {
+      for (const player of players) {
+        if (player) {
+          await this.lpush("joined", player.id);
         }
       }
-      await this.listen();
-    });
+      return;
+    }
+
+    for (let i = 0; i < players.length; i++) {
+      const player = players[i];
+      player.index = i;
+      player.match = match.id;
+      player.piece = game.pieces[i];
+      match.players.push(player.id);
+      await this.savePlayer(player);
+    }
+
+    this.emit("match", game.id, match.id, match.players);
+    await this.saveMatch(match);
+    await this.updatePlayers(game, match, players);
   }
 
   async clear() {
@@ -99,7 +125,7 @@ class Arena extends EventEmitter {
             const players = await this.getPlayers(match.players);
             const command = {
               action: "end",
-              reason: `player ${player.index + 1} left the match`,
+              reason: `Player ${player.index + 1} left.`,
             };
             await Promise.all(players.map((p) => this.send(p, command)));
           }

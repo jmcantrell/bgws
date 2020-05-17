@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const test = require("ava");
 const server = require("../_server");
-const games = require("../../lib/games");
+const games = require("../../server/games");
 
 test.beforeEach(async (t) => {
   await server.start(t);
@@ -13,11 +13,11 @@ test.afterEach.always(async (t) => {
 });
 
 for (const [id, game] of games) {
-  const matches = JSON.parse(
-    fs.readFileSync(path.join(__dirname, id, "matches.json"), "utf8")
-  );
+  const filename = path.join(__dirname, `${id}.json`);
+  if (!fs.existsSync(filename)) continue;
+  const matches = JSON.parse(fs.readFileSync(filename));
   for (const [name, matchExpected] of Object.entries(matches)) {
-    test.serial(`match: ${name}`, async (t) => {
+    test.serial(`${id}: ${name}`, async (t) => {
       await testMatch(t, game, matchExpected);
     });
   }

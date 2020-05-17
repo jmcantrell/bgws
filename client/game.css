@@ -1,0 +1,48 @@
+main {
+  margin: 0;
+}
+
+#container {
+  height: 100%;
+  position: relative;
+  text-align: left;
+}
+
+#container > canvas {
+  position: absolute;
+}
+
+.hide {
+  display: none !important;
+}
+
+.dialog {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 1em;
+  border: 10px solid white;
+  color: white;
+  background-color: darkblue;
+  border-radius: 0.2em;
+  box-shadow: 0 0 1em 0 rgba(255,255,255,1);
+  z-index: 100;
+}
+
+#loading {
+  display: flex;
+  align-items: center;
+  justify-content: space-evenly;
+}
+
+#loading-spinner {
+  font-size: 2em;
+  margin-left: 0.5em;
+}
+
+#message-actions {
+  margin-top: 1em;
+  display: flex;
+  justify-content: space-evenly;
+}

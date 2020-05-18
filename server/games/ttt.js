@@ -1,5 +1,8 @@
 import Game from "../game.js";
 
+const COLUMNS = 3;
+const ROWS = 3;
+
 export default class TicTacToe extends Game {
   constructor() {
     super("ttt");
@@ -14,19 +17,11 @@ export default class TicTacToe extends Game {
     };
   }
 
-  getState(match, player) {
-    const { board, finished, winner } = match;
-    const state = { player: player.index, board, finished, winner };
-    state.turn = finished ? null : match.next == player.index;
-    state.won = winner ? winner.player == player.index : null;
-    return state;
-  }
-
   createBoard() {
     const board = [];
-    for (let row = 0; row < 3; row++) {
+    for (let row = 0; row < ROWS; row++) {
       board.push([]);
-      for (let column = 0; column < 3; column++) {
+      for (let column = 0; column < COLUMNS; column++) {
         board[row].push(null);
       }
     }
@@ -69,10 +64,17 @@ export default class TicTacToe extends Game {
     match.next = match.finished ? null : next;
   }
 
+  getState(match, player) {
+    const { board, finished, winner, next } = match;
+    const state = { player: player.index, board, finished, winner, next };
+    return state;
+  }
+
   isDraw(match) {
     return match.moves.length == 9;
   }
 
+  // TODO: might be able to use c4 solver here
   getWinner(match) {
     const { board } = match;
 

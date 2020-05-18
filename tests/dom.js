@@ -1,5 +1,4 @@
 import test from "ava";
-import loadGames from "../server/games.js";
 import * as server from "./_server.js";
 
 test.beforeEach(async (t) => {
@@ -30,12 +29,11 @@ test("/", async (t) => {
 test("/games/", async (t) => {
   const dom = await server.getDom(t, "games/");
   const { document } = dom;
+  const { games } = t.context.app;
 
   // there is a breadcrumb trail
   t.truthy(document.querySelector("a[href='/']"));
   t.truthy(document.querySelector("a[href='/games/']"));
-
-  const games = await loadGames();
 
   // there is a link for each game
   for (const id of games.keys()) {
@@ -44,7 +42,7 @@ test("/games/", async (t) => {
 });
 
 test("/games/:id/", async (t) => {
-  const games = await loadGames();
+  const { games } = t.context.app;
   for (const id of games.keys()) {
     const url = `games/${id}/`;
     const dom = await server.getDom(t, url);

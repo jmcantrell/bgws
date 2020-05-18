@@ -1,10 +1,9 @@
 import WebSocket from "ws";
-import redis from "redis-mock";
 import got from "got";
 import { once } from "events";
 import jsdom from "jsdom";
 
-import { app, startServer, startLobby } from "../server/app.js";
+import { app, connectRedis, startServer, startLobby } from "../server/app.js";
 
 export function send(ws, message) {
   ws.send(JSON.stringify(message));
@@ -30,7 +29,7 @@ export async function get(t, path, status = 200) {
 }
 
 export async function start(t) {
-  const redisClient = redis.createClient();
+  const redisClient = connectRedis({ db: 1 });
   await startLobby(redisClient);
   await startServer(redisClient);
   t.context.close = async () => {

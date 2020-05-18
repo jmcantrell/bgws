@@ -5,9 +5,9 @@ import { join, dirname } from "path";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const metadata = JSON.parse(readFileSync(join(__dirname, "games", "metadata.json")));
+export const metadata = JSON.parse(readFileSync(join(__dirname, "games", "metadata.json")));
 
-export default async function load() {
+export async function load() {
   const games = [];
 
   for (const id of Object.keys(metadata)) {

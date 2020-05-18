@@ -1,5 +1,8 @@
 import Game from "../game.js";
 
+const COLUMNS = 7;
+const ROWS = 6;
+
 export default class ConnectFour extends Game {
   constructor() {
     super("c4");
@@ -14,19 +17,11 @@ export default class ConnectFour extends Game {
     };
   }
 
-  getState(match, player) {
-    const { board, finished, winner } = match;
-    const state = { player: player.index, board, finished, winner };
-    state.turn = finished ? null : match.next == player.index;
-    state.won = winner ? winner.player == player.index : null;
-    return state;
-  }
-
   createBoard() {
     const board = [];
-    for (let column = 0; column < 7; column++) {
+    for (let column = 0; column < COLUMNS; column++) {
       board.push([]);
-      for (let row = 0; row < 6; row++) {
+      for (let row = 0; row < ROWS; row++) {
         board[column].push(null);
       }
     }
@@ -64,18 +59,93 @@ export default class ConnectFour extends Game {
     move.player = player.index;
     moves.push(move);
 
-    match.winner = this.getWinner(match);
+    match.winner = this.getWinner(board, player, move);
     match.finished = Boolean(match.winner) || this.isDraw(match);
 
     const next = (player.index + 1) % this.numPlayers;
     match.next = match.finished ? null : next;
   }
 
-  getWinner(match) {
-    return null;
+  getState(match, player) {
+    const { board, finished, winner, next } = match;
+    const state = { player: player.index, board, finished, winner, next };
+    return state;
   }
 
   isDraw(match) {
-    return false;
+    return match.moves.length == 42;
+  }
+
+  getWinner(board, player, move) {
+    const { column, row } = move;
+
+    function valid(line) {
+      const head = line[0];
+      const tail = line[3];
+      return (
+        head.column >= 0 &&
+        head.row >= 0 &&
+        tail.column < COLUMNS &&
+        tail.row < ROWS
+      );
+    }
+
+    function check(line) {
+      for (const space of line) {
+        const { column: c, row: r } = space;
+        if (player.index !== board[c][r]) return false;
+      }
+      return true;
+    }
+
+    function make(head) {
+      const line = [];
+      const { column: c, row: r } = head.start;
+      const { column: dc, row: dr } = head.direction;
+      for (let i = 0; i < 4; i++) {
+        line.push({ column: c + i * dc, row: r + i * dr });
+      }
+      return line;
+    }
+
+    const heads = [
+      { start: { column, row: row - 3 }, direction: { column: 0, row: 1 } },
+    ];
+
+    for (let i = 0; i < 4; i++) {
+      const c = column - i;
+      let r;
+
+      if (c < 0) continue;
+
+      heads.push({
+        start: { column: c, row },
+        direction: { column: 1, row: 0 },
+      });
+
+      r = row - i;
+      if (r >= 0) {
+        heads.push({
+          start: { column: c, row: r },
+          direction: { column: 1, row: 1 },
+        });
+      }
+
+      r = row + i;
+      if (r < ROWS) {
+        heads.push({
+          start: { column: c, row: r },
+          direction: { column: 1, row: -1 },
+        });
+      }
+    }
+
+    for (const head of heads) {
+      const line = make(head);
+      if (valid(line) && check(line)) {
+        return { line, player: player.index };
+      }
+    }
+    return null;
   }
 }

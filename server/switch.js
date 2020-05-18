@@ -45,14 +45,7 @@ export default class Switch extends EventEmitter {
       });
 
       ws.on("close", async () => {
-        this.emit("disconnection", id);
-        try {
-          await this.arena.close(id);
-        } catch (err) {
-          this.emit("error", err);
-        } finally {
-          this.clients.delete(id);
-        }
+        await this.close(id);
       });
     });
 
@@ -67,6 +60,19 @@ export default class Switch extends EventEmitter {
         ws.ping();
       }
     }, process.env.WS_PING_TIMEOUT || 30000);
+  }
+
+  async close(id) {
+    try {
+      await this.arena.close(id);
+    } catch (err) {
+      this.emit("error", err);
+    } finally {
+      const ws = this.clients.get(id);
+      if (ws) ws.close();
+      this.clients.delete(id);
+      this.emit("disconnection", id);
+    }
   }
 
   send(id, message) {

@@ -50,7 +50,7 @@
   "ava": {
     "environmentVariables": {
       "PORT": "0",
-      "LOG_LEVEL": "silent"
+      "LOG_LEVEL": "trace"
     }
   }
 }

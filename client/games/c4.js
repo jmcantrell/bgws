@@ -12,13 +12,13 @@ class ConnectFour extends Game {
     this.addLayer("board");
 
     this.elements.container.addEventListener("mousemove", (event) => {
-      if (!this.state || !this.state.turn) return;
+      if (!this.state || this.state.next != this.state.player) return;
       const space = this.getSpace(event.offsetX, event.offsetY);
       this.drawIndicator(space);
     });
 
     this.elements.container.addEventListener("click", (event) => {
-      if (!this.state || !this.state.turn) return;
+      if (!this.state || this.state.next != this.state.player) return;
       const space = this.getSpace(event.offsetX, event.offsetY);
       if (!space) return;
       const cell = this.getEmptyCell(space.column);
@@ -26,7 +26,7 @@ class ConnectFour extends Game {
       const { column, row } = cell;
       this.showLoading("Waiting for turn.");
       this.state.board[column][row] = this.state.player;
-      this.state.turn = false;
+      this.state.next = null;
       this.drawPieces();
       this.drawIndicator();
       this.send({ action: "move", move: { column, row } });
@@ -39,6 +39,7 @@ class ConnectFour extends Game {
     super.draw();
     this.drawBoard();
     this.drawPieces();
+    this.drawWinner();
   }
 
   resize() {
@@ -48,10 +49,7 @@ class ConnectFour extends Game {
 
   update(state) {
     super.update(state);
-    this.drawPieces();
-    if (this.state.winner) {
-      this.drawWinner();
-    }
+    this.draw();
   }
 
   setProperties(viewport) {
@@ -110,8 +108,6 @@ class ConnectFour extends Game {
       frame,
       cells,
       cellSize,
-      holeRadius: Math.trunc(cellCenter * 0.7),
-      pieceRadius: Math.trunc(cellCenter * 0.8),
     };
   }
 
@@ -121,7 +117,7 @@ class ConnectFour extends Game {
     const right = left + grid.width;
     const bottom = top + grid.height;
     if (x > left && x < right && y > top && y < bottom) {
-      const row = Math.trunc((y - top) / cellSize);
+      const row = Math.trunc((bottom - y) / cellSize);
       const column = Math.trunc((x - left) / cellSize);
       return { row, column };
     }
@@ -153,7 +149,8 @@ class ConnectFour extends Game {
   drawBoard() {
     const canvas = this.elements.board;
     const context = canvas.getContext("2d");
-    const { frame, cells, holeRadius } = this.properties;
+    const { frame, cells, cellSize } = this.properties;
+    const holeRadius = Math.trunc(cellSize * 0.4);
 
     context.globalCompositeOperation = "xor";
 
@@ -183,19 +180,14 @@ class ConnectFour extends Game {
     const context = canvas.getContext("2d");
     Game.clearCanvas(canvas, context);
 
-    const { turn, board } = this.state;
-
-    if (!turn || !space) return;
-
-    const { row, column } = space;
-
-    if (board[column][row] != null) return;
+    if (this.state.next != this.state.player || !space) return;
 
     const cell = this.getEmptyCell(space.column);
 
     if (!cell) return;
 
-    const { pieceRadius, cellSize, grid } = this.properties;
+    const { cellSize, grid } = this.properties;
+    const pieceRadius = Math.trunc(cellSize * 0.4);
 
     context.strokeStyle = "white";
     context.lineWidth = Math.trunc(cellSize * 0.08);
@@ -225,6 +217,45 @@ class ConnectFour extends Game {
       2 * Math.PI
     );
     context.fill();
+  }
+
+  drawWinner() {
+    if (!this.state || !this.state.winner) return;
+
+    const canvas = this.elements.hints;
+    const context = canvas.getContext("2d");
+    Game.clearCanvas(canvas, context);
+
+    const { winner, player } = this.state;
+    const { cells } = this.properties;
+
+    for (const space of winner.line) {
+      const { column, row } = space;
+      const cell = cells[column][row];
+      const color = winner.player == 0 ? "black" : "white";
+      const won = winner.player == player;
+      this.drawFace(context, cell.cx, cell.cy, color, won);
+    }
+  }
+
+  drawFace(context, cx, cy, color, won) {
+    const { cellSize } = this.properties;
+    const r = Math.trunc(cellSize * 0.15);
+    const lineWidth = Math.trunc(cellSize * 0.06);
+
+    context.fillStyle = color;
+    context.beginPath();
+    context.ellipse(cx - r, cy - r, lineWidth, lineWidth, 0, 0, 2 * Math.PI);
+    context.ellipse(cx + r, cy - r, lineWidth, lineWidth, 0, 0, 2 * Math.PI);
+    context.fill();
+
+    context.strokeStyle = color;
+    context.beginPath();
+    context.lineWidth = lineWidth;
+    context.lineCap = "round";
+    const offset = won ? 0 : r;
+    context.arc(cx, cy + offset, r, Math.PI, 2 * Math.PI, won);
+    context.stroke();
   }
 }
 

@@ -9,7 +9,7 @@ import redis from "redis";
 
 import Arena from "./arena.js";
 import Switch from "./switch.js";
-import loadGames from "./games.js";
+import { load } from "./games.js";
 
 const port = process.env.PORT || 3000;
 const logLevel = process.env.LOG_LEVEL || "info";
@@ -55,14 +55,14 @@ app.use((err, req, res, next) => {
   return next();
 });
 
-export function connectRedis() {
-  return redis.createClient(process.env.REDIS_URL);
+export function connectRedis(options = {}) {
+  return redis.createClient(process.env.REDIS_URL, options);
 }
 
 export async function startServer(redis = null) {
   if (redis === null) redis = connectRedis();
 
-  const games = await loadGames();
+  const games = await load();
   const arena = new Arena({ redis, games });
 
   // Games accessible to router.
@@ -98,12 +98,29 @@ export async function startServer(redis = null) {
   app.server.on("close", () => {
     logger.info("http server closing");
   });
+
+  let closing = false
+  async function onProcessExit() {
+    if (closing) return;
+    closing = true;
+    logger.info("closing http server");
+    for (const id of app.switch.clients.keys()) {
+      await app.switch.close(id);
+    }
+    app.server.close(() => {
+      process.exit();
+    });
+  }
+
+  process.on('SIGINT', onProcessExit);
+  process.on('SIGQUIT', onProcessExit);
+  process.on('SIGTERM', onProcessExit);
 }
 
 export async function startLobby(redis = null) {
   if (redis === null) redis = connectRedis();
 
-  const games = await loadGames();
+  const games = await load();
   const arena = new Arena({ redis, games });
 
   arena.on("match", (game, match, players) => {
@@ -115,7 +132,6 @@ export async function startLobby(redis = null) {
   });
 
   try {
-    await arena.clear();
     logger.info("waiting for players");
     await arena.listen();
   } catch (err) {

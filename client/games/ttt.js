@@ -11,20 +11,20 @@ class TicTacToe extends Game {
     this.addLayer("board");
 
     this.elements.container.addEventListener("mousemove", (event) => {
-      if (!this.state || !this.state.turn) return;
+      if (!this.state || this.state.next != this.state.player) return;
       const space = this.getSpace(event.offsetX, event.offsetY);
       this.drawIndicator(space);
     });
 
     this.elements.container.addEventListener("click", (event) => {
-      if (!this.state || !this.state.turn) return;
+      if (!this.state || this.state.next != this.state.player) return;
       const space = this.getSpace(event.offsetX, event.offsetY);
       if (!space) return;
       const { row, column } = space;
       if (this.state.board[row][column]) return;
       this.showLoading("Waiting for turn.");
       this.state.board[row][column] = this.state.player;
-      this.state.turn = false;
+      this.state.next = null;
       this.drawPieces();
       this.drawIndicator();
       this.send({ action: "move", move: space });
@@ -37,6 +37,7 @@ class TicTacToe extends Game {
     super.draw();
     this.drawBoard();
     this.drawPieces();
+    this.drawWinner();
   }
 
   resize() {
@@ -46,10 +47,7 @@ class TicTacToe extends Game {
 
   update(state) {
     super.update(state);
-    this.drawPieces();
-    if (this.state.winner) {
-      this.drawWinner();
-    }
+    this.draw();
   }
 
   setProperties(viewport) {
@@ -158,12 +156,14 @@ class TicTacToe extends Game {
   }
 
   drawWinner() {
-    const { hints } = this.elements;
+    if (!this.state || !this.state.winner) return;
+
+    const canvas = this.elements.hints;
+    const context = canvas.getContext("2d");
+    Game.clearCanvas(canvas, context);
+
     const { winner, player } = this.state;
     const { cellSize, cells } = this.properties;
-
-    const context = hints.getContext("2d");
-    Game.clearCanvas(hints, context);
 
     context.fillStyle = winner.player == player ? "darkgreen" : "darkred";
     for (const space of winner.line) {
@@ -177,7 +177,7 @@ class TicTacToe extends Game {
     const context = canvas.getContext("2d");
     Game.clearCanvas(canvas, context);
 
-    if (!this.state.turn || !space) return;
+    if (this.state.next != this.state.player || !space) return;
 
     const { row, column } = space;
     const { player, board } = this.state;

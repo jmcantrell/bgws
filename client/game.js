@@ -63,16 +63,16 @@ export default class Game extends EventTarget {
   update(state) {
     this.state = state;
 
-    const { finished, winner, turn, won } = this.state;
+    const { player, finished, winner, next } = this.state;
 
     if (finished) {
       if (winner) {
-        this.showMessage(won ? "You won!" : "You lost.");
+        this.showMessage(winner.player == player ? "You won!" : "You lost.");
       } else {
         this.showMessage("It's a draw!");
       }
     } else {
-      if (turn) {
+      if (next == player) {
         this.hideLoading();
       } else {
         this.showLoading("Waiting for turn.");
@@ -82,7 +82,8 @@ export default class Game extends EventTarget {
 
   end(reason) {
     this.showMessage(reason);
-    this.state.turn = false;
+    this.state.next = null;
+    this.ws.close();
   }
 
   draw() {

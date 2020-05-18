@@ -1,6 +1,5 @@
 import { v4 as uuid } from "uuid";
 import EventEmitter from "events";
-import { promisify } from "util";
 
 export default class Arena extends EventEmitter {
   constructor({ redis, games }) {
@@ -9,16 +8,6 @@ export default class Arena extends EventEmitter {
     this.games = games;
 
     this.channel = uuid();
-
-    this.brpop = promisify(redis.brpop).bind(redis);
-    this.del = promisify(redis.del).bind(redis);
-    this.hdel = promisify(redis.hdel).bind(redis);
-    this.hget = promisify(redis.hget).bind(redis);
-    this.hset = promisify(redis.hset).bind(redis);
-    this.llen = promisify(redis.llen).bind(redis);
-    this.lpush = promisify(redis.lpush).bind(redis);
-    this.publish = promisify(redis.publish).bind(redis);
-    this.rpop = promisify(redis.rpop).bind(redis);
 
     const subscriber = redis.duplicate();
     subscriber.subscribe(this.channel);
@@ -37,27 +26,64 @@ export default class Arena extends EventEmitter {
     });
   }
 
+  nextPlayer() {
+    return new Promise((resolve, reject) => {
+      this.redis.brpop("joined", 0, (err, res) => {
+        if (err) return reject(err);
+        return resolve(res[1]);
+      });
+    });
+  }
+
+  sortPlayer(gameID, playerID) {
+    return new Promise((resolve, reject) => {
+      const waiting = `waiting:${gameID}`;
+      this.redis.lpush(waiting, playerID, (err, res) => {
+        if (err) return reject(err);
+        return resolve(res);
+      });
+    });
+  }
+
   async sortNextPlayer() {
     try {
-      const res = await this.brpop("joined", 0);
-      const playerID = res[1];
+      const playerID = await this.nextPlayer();
       const player = await this.getPlayer(playerID);
-      const waiting = `waiting:${player.game}`;
-      await this.lpush(waiting, playerID);
+      if (!player) throw new Error("player disappeared");
+      await this.sortPlayer(player.game, playerID);
       await this.checkWaiting(player.game);
     } catch (err) {
       this.emit("error", err);
     }
   }
 
+  nextWaitingPlayer(gameID) {
+    const waiting = `waiting:${gameID}`;
+    return new Promise((resolve, reject) => {
+      this.redis.rpop(waiting, (err, res) => {
+        if (err) return reject(err);
+        return resolve(res);
+      });
+    });
+  }
+
+  numWaitingPlayers(gameID) {
+    const waiting = `waiting:${gameID}`;
+    return new Promise((resolve, reject) => {
+      this.redis.llen(waiting, (err, res) => {
+        if (err) return reject(err);
+        return resolve(res);
+      });
+    });
+  }
+
   async checkWaiting(gameID) {
     const game = this.games.get(gameID);
-    const waiting = `waiting:${gameID}`;
-    const count = await this.llen(waiting);
+    const count = await this.numWaitingPlayers(gameID);
     if (count >= game.numPlayers) {
       const playerIDs = [];
       for (let i = 0; i < game.numPlayers; i++) {
-        playerIDs.push(await this.rpop(waiting));
+        playerIDs.push(await this.nextWaitingPlayer(gameID));
       }
       const players = await this.getPlayers(playerIDs);
       await this.createMatch(game, players);
@@ -75,9 +101,7 @@ export default class Arena extends EventEmitter {
     // will be missing, so re-queue the other players;
     if (players.includes(null)) {
       for (const player of players) {
-        if (player) {
-          await this.lpush("joined", player.id);
-        }
+        if (player) await this.addPlayer(player.id);
       }
       return;
     }
@@ -95,19 +119,10 @@ export default class Arena extends EventEmitter {
     await this.updatePlayers(game, match, players);
   }
 
-  async clear() {
-    await this.del("joined");
-    await this.del("players");
-    for (const gameID of this.games.keys()) {
-      await this.del(`waiting:${gameID}`);
-    }
-  }
-
   async join(playerID, gameID) {
     const player = { id: playerID, game: gameID, channel: this.channel };
     await this.savePlayer(player);
-    await this.lpush("joined", playerID);
-    this.emit("join", player);
+    await this.addPlayer(playerID);
   }
 
   async command(playerID, command) {
@@ -140,10 +155,10 @@ export default class Arena extends EventEmitter {
             };
             await Promise.all(players.map((p) => this.send(p, command)));
           }
-          await this.hdel("matches", match.id);
+          await this.deleteMatch(match.id);
         }
       }
-      await this.hdel("players", playerID);
+      await this.deletePlayer(playerID);
     }
   }
 
@@ -156,32 +171,82 @@ export default class Arena extends EventEmitter {
     );
   }
 
-  async send(player, command) {
+  send(player, command) {
     const message = JSON.stringify({ id: player.id, data: command });
-    await this.publish(player.channel, message);
+    return new Promise((resolve, reject) => {
+      this.redis.publish(player.channel, message, (err, res) => {
+        if (err) return reject(err);
+        return resolve(res);
+      });
+    });
   }
 
-  async getMatch(matchID) {
-    const value = await this.hget("matches", matchID);
-    return value ? JSON.parse(value) : null;
+  getMatch(matchID) {
+    return new Promise((resolve, reject) => {
+      this.redis.hget("matches", matchID, (err, res) => {
+        if (err) return reject(err);
+        return resolve(res ? JSON.parse(res) : null);
+      });
+    });
   }
 
-  async saveMatch(match) {
+  saveMatch(match) {
     const value = JSON.stringify(match);
-    await this.hset("matches", match.id, value);
+    return new Promise((resolve, reject) => {
+      this.redis.hset("matches", match.id, value, (err, res) => {
+        if (err) return reject(err);
+        return resolve(res);
+      });
+    });
   }
 
-  async getPlayer(id) {
-    const value = await this.hget("players", id);
-    return value ? JSON.parse(value) : null;
+  deleteMatch(matchID) {
+    return new Promise((resolve, reject) => {
+      this.redis.hdel("matches", matchID, (err, res) => {
+        if (err) return reject(err);
+        return resolve(res);
+      });
+    });
+  }
+
+  addPlayer(playerID) {
+    return new Promise((resolve, reject) => {
+      this.redis.lpush("joined", playerID, (err, res) => {
+        if (err) return reject(err);
+        return resolve(res);
+      });
+    });
+  }
+
+  getPlayer(playerID) {
+    return new Promise((resolve, reject) => {
+      this.redis.hget("players", playerID, (err, res) => {
+        if (err) return reject(err);
+        return resolve(res ? JSON.parse(res) : null);
+      });
+    });
   }
 
   async getPlayers(playerIDs) {
     return await Promise.all(playerIDs.map((id) => this.getPlayer(id)));
   }
 
-  async savePlayer(player) {
+  savePlayer(player) {
     const value = JSON.stringify(player);
-    await this.hset("players", player.id, value);
+    return new Promise((resolve, reject) => {
+      this.redis.hset("players", player.id, value, (err, res) => {
+        if (err) return reject(err);
+        return resolve(res);
+      });
+    });
+  }
+
+  deletePlayer(playerID) {
+    return new Promise((resolve, reject) => {
+      this.redis.hdel("players", playerID, (err, res) => {
+        if (err) return reject(err);
+        return resolve(res);
+      });
+    });
   }
 }

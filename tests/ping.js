@@ -1,5 +1,5 @@
-const test = require("ava");
-const server = require("./_server");
+import test from "ava";
+import * as server from "./_server.js";
 
 test.beforeEach(async (t) => {
   await server.start(t);

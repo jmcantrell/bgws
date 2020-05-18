@@ -1,1 +1,3 @@
-require("./server/app").startLobby();
+import { startLobby } from "./server/app.js";
+
+startLobby();

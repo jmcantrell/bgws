@@ -1,22 +1,24 @@
-const fs = require("fs");
-const http = require("http");
-const express = require("express");
-const helmet = require("helmet");
-const compression = require("compression");
-const pino = require("pino");
-const pinoHttp = require("pino-http");
-const redis = require("redis");
+import fs from "fs";
+import http from "http";
+import express from "express";
+import helmet from "helmet";
+import compression from "compression";
+import pino from "pino";
+import pinoHttp from "pino-http";
+import redis from "redis";
 
-const Arena = require("./arena");
-const Switch = require("./switch");
-const games = require("./games");
+import Arena from "./arena.js";
+import Switch from "./switch.js";
+import loadGames from "./games.js";
 
+const port = process.env.PORT || 3000;
 const logLevel = process.env.LOG_LEVEL || "info";
+
 const logger = pino({ level: logLevel });
 
 const pkg = JSON.parse(fs.readFileSync("./package.json", "utf8"));
 
-const app = express();
+export const app = express();
 
 app.set("view engine", "pug");
 
@@ -26,24 +28,20 @@ app.locals.homepage = pkg.homepage;
 
 app.use(helmet());
 app.use(compression());
-// app.use(pinoHttp({ logger }));
+app.use(pinoHttp({ logger }));
 app.use(express.static("client"));
 
 app.get("/", (req, res) => {
   return res.render("index");
 });
 
-const gameNames = [];
-for (const [id, game] of games.entries()) {
-  gameNames.push({ id, name: game.name });
-}
 app.get("/games/", (req, res) => {
-  return res.render("games", { games: gameNames });
+  return res.render("games");
 });
 
 app.get("/games/:id/", (req, res) => {
   const { id } = req.params;
-  const { name } = games.get(id);
+  const { name } = app.games.get(id);
   return res.render("game", { id, name });
 });
 
@@ -57,16 +55,24 @@ app.use((err, req, res, next) => {
   return next();
 });
 
-app.connectRedis = () => {
+export function connectRedis() {
   return redis.createClient(process.env.REDIS_URL);
-};
+}
 
-app.startServer = () => {
-  const redis = app.connectRedis();
-  const port = process.env.PORT || 3000;
+export async function startServer(redis = null) {
+  if (redis === null) redis = connectRedis();
+
+  const games = await loadGames();
+  const arena = new Arena({ redis, games });
+
+  // Games accessible to router.
+  app.games = games;
+
+  // Games accessible to templates.
+  app.locals.games = Array.from(games.values());
 
   app.server = http.createServer(app);
-  app.switch = new Switch({ redis, server: app.server });
+  app.switch = new Switch({ server: app.server, arena });
 
   app.switch.on("connection", (id) => {
     logger.info({ player: id }, "player connected");
@@ -92,11 +98,13 @@ app.startServer = () => {
   app.server.on("close", () => {
     logger.info("http server closing");
   });
-};
+}
 
-app.startLobby = async () => {
-  const redis = app.connectRedis();
-  const arena = new Arena({ redis });
+export async function startLobby(redis = null) {
+  if (redis === null) redis = connectRedis();
+
+  const games = await loadGames();
+  const arena = new Arena({ redis, games });
 
   arena.on("match", (game, match, players) => {
     logger.info({ game, match, players }, "match started");
@@ -108,11 +116,9 @@ app.startLobby = async () => {
 
   try {
     await arena.clear();
-    await arena.listen();
     logger.info("waiting for players");
+    await arena.listen();
   } catch (err) {
     logger.error(err);
   }
-};
-
-module.exports = app;
+}

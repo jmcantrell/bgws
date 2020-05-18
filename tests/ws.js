@@ -1,8 +1,8 @@
-const fs = require("fs");
-const path = require("path");
-const test = require("ava");
-const server = require("./_server");
-const games = require("../server/games");
+import fs from "fs";
+import path from "path";
+import test from "ava";
+import loadGames from "../server/games.js";
+import * as server from "./_server.js";
 
 test.beforeEach(async (t) => {
   await server.start(t);
@@ -12,16 +12,18 @@ test.afterEach.always(async (t) => {
   await server.close(t);
 });
 
-for (const [id, game] of games) {
-  const filename = path.join(__dirname, "games", "matches", `${id}.json`);
-  if (!fs.existsSync(filename)) continue;
-  const matches = JSON.parse(fs.readFileSync(filename));
-  for (const [name, matchExpected] of Object.entries(matches)) {
-    test.serial(`${id}: ${name}`, async (t) => {
-      await testMatch(t, game, matchExpected);
-    });
+loadGames().then((games) => {
+  for (const [id, game] of games) {
+    const filename = path.join("./games", "matches", `${id}.json`);
+    if (!fs.existsSync(filename)) continue;
+    const matches = JSON.parse(fs.readFileSync(filename));
+    for (const [name, matchExpected] of Object.entries(matches)) {
+      test.serial(`${id}: ${name}`, async (t) => {
+        await testMatch(t, game, matchExpected);
+      });
+    }
   }
-}
+});
 
 test.serial("first command must be join", (t) => {
   const ws = t.context.createWebSocket();

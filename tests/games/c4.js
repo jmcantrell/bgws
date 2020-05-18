@@ -1,11 +1,16 @@
-const fs = require("fs");
-const path = require("path");
-const test = require("ava");
-const ConnectFour = require("../../server/games/c4");
+import fs from "fs";
+import test from "ava";
+import ConnectFour from "../../server/games/c4.js";
+
+import { fileURLToPath } from "url";
+import { join, dirname } from "path";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const game = new ConnectFour();
 
-const filename = path.join(__dirname, "matches", `${game.id}.json`);
+const filename = join(__dirname, `${game.id}.json`);
 const matches = JSON.parse(fs.readFileSync(filename));
 const move = matches[Object.keys(matches)[0]].moves[0];
 const match = game.createMatch();

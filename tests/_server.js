@@ -1,43 +1,38 @@
-const WebSocket = require("ws");
-const redis = require("redis-mock");
-const got = require("got");
-const { once } = require("events");
-const { JSDOM } = require("jsdom");
+import WebSocket from "ws";
+import redis from "redis-mock";
+import got from "got";
+import { once } from "events";
+import jsdom from "jsdom";
 
-process.on("warning", (e) => console.warn(e.stack));
+import { app, startServer, startLobby } from "../server/app.js";
 
-process.env.PORT = 0;
-process.env.LOG_LEVEL = "silent";
-
-const app = require("../server/app");
-
-function send(ws, message) {
+export function send(ws, message) {
   ws.send(JSON.stringify(message));
 }
 
-async function receive(ws) {
+export async function receive(ws) {
   const events = await once(ws, "message");
   return JSON.parse(events[0].data);
 }
 
-async function getDom(t, path, status = 200) {
+export async function getDom(t, path, status = 200) {
   const res = await get(t, path, status);
-  const dom = new JSDOM(res.body);
+  const dom = new jsdom.JSDOM(res.body);
   dom.document = dom.window.document;
   return dom;
 }
 
-async function get(t, path, status = 200) {
+export async function get(t, path, status = 200) {
   const { prefixUrl } = t.context;
   const res = await got(path, { prefixUrl, throwHttpErrors: false });
   t.is(res.statusCode, status);
   return res;
 }
 
-async function start(t) {
+export async function start(t) {
   const redisClient = redis.createClient();
-  await app.startLobby({ redis: redisClient });
-  await app.startServer({ redis: redisClient });
+  await startLobby(redisClient);
+  await startServer(redisClient);
   t.context.close = async () => {
     await redisClient.quit();
     await app.server.close();
@@ -50,8 +45,6 @@ async function start(t) {
   };
 }
 
-async function close(t) {
+export async function close(t) {
   await t.context.close();
 }
-
-module.exports = { start, close, get, getDom, send, receive };

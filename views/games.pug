@@ -2,5 +2,8 @@ extends base
 
 block main
   each game in games
-    p
-      a(href=`/games/${game.id}/`) #{game.name}
+    div(style="text-align:left")
+      p
+        a(href=`/games/${game.id}/`)
+          h2= game.name
+      p !{game.description}

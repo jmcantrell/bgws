@@ -1,34 +1,23 @@
-const uuid = require("uuid");
-const EventEmitter = require("events");
-const WebSocket = require("ws");
-const Arena = require("./arena");
+import { v4 as uuid } from "uuid";
+import EventEmitter from "events";
+import WebSocket from "ws";
 
-class Switch extends EventEmitter {
-  constructor({ redis, server }) {
-    super({ redis, server });
+export default class Switch extends EventEmitter {
+  constructor({ server, arena }) {
+    super();
+    this.arena = arena;
+    this.wss = new WebSocket.Server({ server });
 
     // Each websocket connection is given a unique ID.
     // This is a mapping of those IDs to their websocket.
     this.clients = new Map();
 
-    // Each server node has a dedicated pubsub channel.
-    this.channel = uuid.v4();
-
-    this.subscriber = redis.duplicate();
-    this.subscriber.subscribe(this.channel);
-
-    this.subscriber.on("message", (channel, message) => {
-      const delivery = JSON.parse(message);
-      const { id, data } = delivery;
-      this.send(id, data);
+    this.arena.on("message", (id, message) => {
+      this.send(id, message);
     });
 
-    this.arena = new Arena({ redis });
-
-    this.wss = new WebSocket.Server({ server });
-
     this.wss.on("connection", async (ws) => {
-      const id = uuid.v4();
+      const id = uuid();
       this.clients.set(id, ws);
 
       this.emit("connection", id);
@@ -39,7 +28,7 @@ class Switch extends EventEmitter {
         try {
           switch (data.action) {
             case "join":
-              return await this.arena.join(id, data.game, this.channel);
+              return await this.arena.join(id, data.game);
             default:
               return await this.arena.command(id, data);
           }
@@ -80,10 +69,8 @@ class Switch extends EventEmitter {
     }, process.env.WS_PING_TIMEOUT || 30000);
   }
 
-  send(id, data) {
+  send(id, message) {
     const ws = this.clients.get(id);
-    if (ws) ws.send(JSON.stringify(data));
+    if (ws) ws.send(JSON.stringify(message));
   }
 }
-
-module.exports = Switch;

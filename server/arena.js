@@ -1,12 +1,15 @@
-const uuid = require("uuid");
-const EventEmitter = require("events");
-const { promisify } = require("util");
-const games = require("./games");
+import { v4 as uuid } from "uuid";
+import EventEmitter from "events";
+import { promisify } from "util";
 
-class Arena extends EventEmitter {
-  constructor({ redis }) {
+export default class Arena extends EventEmitter {
+  constructor({ redis, games }) {
     super();
     this.redis = redis;
+    this.games = games;
+
+    this.channel = uuid();
+
     this.brpop = promisify(redis.brpop).bind(redis);
     this.del = promisify(redis.del).bind(redis);
     this.hdel = promisify(redis.hdel).bind(redis);
@@ -16,6 +19,15 @@ class Arena extends EventEmitter {
     this.lpush = promisify(redis.lpush).bind(redis);
     this.publish = promisify(redis.publish).bind(redis);
     this.rpop = promisify(redis.rpop).bind(redis);
+
+    const subscriber = redis.duplicate();
+    subscriber.subscribe(this.channel);
+
+    subscriber.on("message", (channel, message) => {
+      const delivery = JSON.parse(message);
+      const { id, data } = delivery;
+      this.emit("message", id, data);
+    });
   }
 
   async listen() {
@@ -39,7 +51,7 @@ class Arena extends EventEmitter {
   }
 
   async checkWaiting(gameID) {
-    const game = games.get(gameID);
+    const game = this.games.get(gameID);
     const waiting = `waiting:${gameID}`;
     const count = await this.llen(waiting);
     if (count >= game.numPlayers) {
@@ -54,7 +66,7 @@ class Arena extends EventEmitter {
 
   async createMatch(game, players) {
     const match = game.createMatch();
-    match.id = uuid.v4();
+    match.id = uuid();
     match.game = game.id;
     match.start = Date.now();
     match.players = [];
@@ -86,13 +98,13 @@ class Arena extends EventEmitter {
   async clear() {
     await this.del("joined");
     await this.del("players");
-    for (const gameID of games.keys()) {
+    for (const gameID of this.games.keys()) {
       await this.del(`waiting:${gameID}`);
     }
   }
 
-  async join(playerID, gameID, channel) {
-    const player = { id: playerID, game: gameID, channel };
+  async join(playerID, gameID) {
+    const player = { id: playerID, game: gameID, channel: this.channel };
     await this.savePlayer(player);
     await this.lpush("joined", playerID);
     this.emit("join", player);
@@ -107,7 +119,7 @@ class Arena extends EventEmitter {
     if (!match) {
       throw new Error("unable to find match");
     }
-    const game = games.get(player.game);
+    const game = this.games.get(player.game);
     game.command(match, player, command);
     await this.saveMatch(match);
     const players = await this.getPlayers(match.players);
@@ -173,5 +185,3 @@ class Arena extends EventEmitter {
     await this.hset("players", player.id, value);
   }
 }
-
-module.exports = Arena;

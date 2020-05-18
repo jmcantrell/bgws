@@ -1,8 +1,25 @@
-const Game = require("../game");
+import Game from "../game.js";
 
-class TicTacToe extends Game {
+export default class TicTacToe extends Game {
   constructor() {
-    super("ttt", "Tic-Tac-Toe", 2);
+    super("ttt");
+    this.numPlayers = 2;
+  }
+
+  createMatch() {
+    return {
+      moves: [],
+      next: 0,
+      board: this.createBoard(),
+    };
+  }
+
+  getState(match, player) {
+    const { board, finished, winner } = match;
+    const state = { player: player.index, board, finished, winner };
+    state.turn = finished ? null : match.next == player.index;
+    state.won = winner ? winner.player == player.index : null;
+    return state;
   }
 
   createBoard() {
@@ -133,5 +150,3 @@ class TicTacToe extends Game {
     return null;
   }
 }
-
-module.exports = TicTacToe;

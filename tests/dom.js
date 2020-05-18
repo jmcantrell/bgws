@@ -1,6 +1,6 @@
-const test = require("ava");
-const games = require("../server/games");
-const server = require("./_server");
+import test from "ava";
+import loadGames from "../server/games.js";
+import * as server from "./_server.js";
 
 test.beforeEach(async (t) => {
   await server.start(t);
@@ -12,7 +12,7 @@ test.afterEach.always(async (t) => {
 
 test("404", async (t) => {
   const dom = await server.getDom(t, "bogus", 404);
-  const {document} = dom;
+  const { document } = dom;
 
   // there is a breadcrumb trail
   t.truthy(document.querySelector("a[href='/']"));
@@ -35,16 +35,18 @@ test("/games/", async (t) => {
   t.truthy(document.querySelector("a[href='/']"));
   t.truthy(document.querySelector("a[href='/games/']"));
 
+  const games = await loadGames();
+
   // there is a link for each game
   for (const id of games.keys()) {
     t.truthy(document.querySelector(`a[href='/games/${id}/']`));
   }
 });
 
-for (const id of games.keys()) {
-  const url = `games/${id}/`;
-
-  test(`/${url}`, async (t) => {
+test("/games/:id/", async (t) => {
+  const games = await loadGames();
+  for (const id of games.keys()) {
+    const url = `games/${id}/`;
     const dom = await server.getDom(t, url);
     const { document } = dom;
 
@@ -83,5 +85,5 @@ for (const id of games.keys()) {
     // there is a container for the canvases
     const container = document.getElementById("container");
     t.truthy(container);
-  });
-}
+  }
+});

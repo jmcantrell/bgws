@@ -1,8 +1,25 @@
-const Game = require("../game");
+import Game from "../game.js";
 
-class ConnectFour extends Game {
+export default class ConnectFour extends Game {
   constructor() {
-    super("c4", "Connect Four", 2);
+    super("c4");
+    this.numPlayers = 2;
+  }
+
+  createMatch() {
+    return {
+      moves: [],
+      next: 0,
+      board: this.createBoard(),
+    };
+  }
+
+  getState(match, player) {
+    const { board, finished, winner } = match;
+    const state = { player: player.index, board, finished, winner };
+    state.turn = finished ? null : match.next == player.index;
+    state.won = winner ? winner.player == player.index : null;
+    return state;
   }
 
   createBoard() {
@@ -62,5 +79,3 @@ class ConnectFour extends Game {
     return false;
   }
 }
-
-module.exports = ConnectFour;

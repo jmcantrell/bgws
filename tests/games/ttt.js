@@ -1,11 +1,16 @@
-const fs = require("fs");
-const path = require("path");
-const test = require("ava");
-const TicTacToe = require("../../server/games/ttt");
+import fs from "fs";
+import test from "ava";
+import TicTacToe from "../../server/games/ttt.js";
+
+import { fileURLToPath } from "url";
+import { join, dirname } from "path";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const game = new TicTacToe();
 
-const filename = path.join(__dirname, "matches", `${game.id}.json`);
+const filename = join(__dirname, `${game.id}.json`);
 const matches = JSON.parse(fs.readFileSync(filename));
 const move = matches[Object.keys(matches)[0]].moves[0];
 const match = game.createMatch();

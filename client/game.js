@@ -1,8 +1,7 @@
 const WEBSOCKET_URL = location.origin.replace(/^http/, "ws");
 
-export default class Game extends EventTarget {
+export default class Game {
   constructor(id) {
-    super();
     this.id = id;
     this.layers = [];
     this.elements = {};

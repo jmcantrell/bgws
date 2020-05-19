@@ -29,11 +29,9 @@ export async function get(t, path, status = 200) {
 }
 
 export async function start(t) {
-  const redisClient = connectRedis({ db: 1 });
-  await startLobby(redisClient);
-  await startServer(redisClient);
+  await startLobby(connectRedis({ db: 1 }));
+  await startServer(connectRedis({ db: 1 }));
   t.context.close = async () => {
-    await redisClient.quit();
     await app.server.close();
   };
   t.context.app = app;

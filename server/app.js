@@ -1,5 +1,7 @@
 import fs from "fs";
+import { cpus } from "os";
 import http from "http";
+import throng from "throng";
 import express from "express";
 import helmet from "helmet";
 import compression from "compression";
@@ -11,12 +13,18 @@ import Arena from "./arena.js";
 import Switch from "./switch.js";
 import { load } from "./games.js";
 
+import { fileURLToPath } from "url";
+import { join, dirname } from "path";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+const pkg = JSON.parse(fs.readFileSync(join(__dirname, "..", "package.json"), "utf8"));
+
 const port = process.env.PORT || 3000;
 const logLevel = process.env.LOG_LEVEL || "info";
 
 const logger = pino({ level: logLevel });
-
-const pkg = JSON.parse(fs.readFileSync("./package.json", "utf8"));
 
 export const app = express();
 
@@ -117,6 +125,15 @@ export async function startServer(redis = null) {
   process.on('SIGTERM', onProcessExit);
 }
 
+export async function startCluster(redis = null) {
+  const numCPUs = cpus().length;
+  const workers = process.env.WEB_CONCURRENCY || numCPUs;
+
+  throng({ workers }, async () => {
+    await startServer(redis);
+  });
+}
+
 export async function startLobby(redis = null) {
   if (redis === null) redis = connectRedis();
 
@@ -131,10 +148,7 @@ export async function startLobby(redis = null) {
     logger.error(err);
   });
 
-  try {
-    logger.info("waiting for players");
-    await arena.listen();
-  } catch (err) {
-    logger.error(err);
-  }
+  logger.info("waiting for players");
+
+  await arena.listen();
 }

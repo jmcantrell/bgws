@@ -63,16 +63,11 @@ export default class Switch extends EventEmitter {
   }
 
   async close(id) {
-    try {
-      await this.arena.close(id);
-    } catch (err) {
-      this.emit("error", err);
-    } finally {
-      const ws = this.clients.get(id);
-      if (ws) ws.close();
-      this.clients.delete(id);
-      this.emit("disconnection", id);
-    }
+    await this.arena.close(id);
+    const ws = this.clients.get(id);
+    if (ws) ws.close();
+    this.clients.delete(id);
+    this.emit("disconnection", id);
   }
 
   send(id, message) {

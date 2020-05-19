@@ -22,43 +22,53 @@ for (const id of Object.keys(games.metadata)) {
   if (!fs.existsSync(filename)) continue;
   const matches = JSON.parse(fs.readFileSync(filename));
   for (const [name, matchExpected] of Object.entries(matches)) {
-    test.serial.skip(`${id}: ${name}`, async (t) => {
+    test.serial(`${id}: ${name}`, async (t) => {
       const game = t.context.app.games.get(id);
       await testMatch(t, game, matchExpected);
     });
   }
+
+  test.serial(`${id}: invalid command`, async (t) => {
+    const ws1 = t.context.createWebSocket();
+    const ws2 = t.context.createWebSocket();
+    return new Promise((resolve) => {
+      ws1.on("open", async () => {
+        setTimeout(async () => {
+          server.send(ws1, { action: "join", game: id });
+          await server.receive(ws1);
+          server.send(ws1, { action: "bogus" });
+          const update = await server.receive(ws1);
+          t.is(update.error, "unable to perform command");
+          ws1.close();
+          resolve();
+        }, 0);
+      });
+      ws2.on("open", async () => {
+        setTimeout(async () => {
+          server.send(ws2, { action: "join", game: id });
+          await server.receive(ws2);
+          await server.receive(ws2);
+          ws2.close();
+          resolve();
+        }, 100);
+      });
+    });
+  });
 }
 
 test.serial("first command must be join", (t) => {
   const ws = t.context.createWebSocket();
-
   return new Promise((resolve) => {
     ws.on("open", async () => {
       setTimeout(async () => {
-        server.send(ws, { action: "join", game: "ttt" });
-
-        const command = await server.receive(ws);
-
+        server.send(ws, { action: "bogus" });
+        const update = await server.receive(ws);
+        t.is(update.error, "unable to perform command");
         ws.close();
         resolve();
-      }, 100);
+      }, 0);
     });
   });
-      // server.send(ws, { action: "bogus" });
-      // const command = await server.receive(ws);
-      // t.log(command);
-      // ws.close();
-      // t.pass();
-      // return resolve();
-    // });
-
-    // ws.on("message", (message) => {
-    //   const data = JSON.parse(message);
-    //   t.is(data.error, "unable to perform command");
-    //   t.log(message)
-    //   ws.close();
-    //   resolve();
-    // });
 });
 
 async function waitForTurn(t, ws, playerIndex) {

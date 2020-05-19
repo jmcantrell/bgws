@@ -153,7 +153,7 @@ export default class Arena extends EventEmitter {
               action: "end",
               reason: `Player ${player.index + 1} left.`,
             };
-            await Promise.all(players.map((p) => this.send(p, command)));
+            await this.broadcast(players, command);
           }
           await this.deleteMatch(match.id);
         }
@@ -179,6 +179,10 @@ export default class Arena extends EventEmitter {
         return resolve(res);
       });
     });
+  }
+
+  broadcast(players, command) {
+    return Promise.all(players.map((p) => this.send(p, command)));
   }
 
   getMatch(matchID) {

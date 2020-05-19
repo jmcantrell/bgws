@@ -1,2 +1,2 @@
-web: node web.js
-lobby: node lobby.js
+web: node --experimental-modules web.js
+lobby: node --experimental-modules lobby.js

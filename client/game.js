@@ -52,6 +52,7 @@ export default class Game extends EventTarget {
     this.ws.addEventListener("close", () => {
       console.log("websocket connection closed");
       this.showMessage("Server disconnected!");
+      this.draw()
     });
 
     this.elements.messageOkay.addEventListener("click", (event) => {

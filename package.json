@@ -44,8 +44,7 @@
     "got": "^11.1.4",
     "jsdom": "^16.2.2",
     "nodemon": "^2.0.4",
-    "pino-pretty": "^4.0.0",
-    "redis-mock": "^0.49.0"
+    "pino-pretty": "^4.0.0"
   },
   "ava": {
     "environmentVariables": {

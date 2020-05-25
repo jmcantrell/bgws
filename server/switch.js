@@ -5,6 +5,7 @@ import WebSocket from "ws";
 export default class Switch extends EventEmitter {
   constructor({ server, arena }) {
     super();
+
     this.arena = arena;
     this.wss = new WebSocket.Server({ server });
 
@@ -23,14 +24,17 @@ export default class Switch extends EventEmitter {
       this.emit("connection", id);
 
       ws.on("message", async (message) => {
-        const data = JSON.parse(message);
-        this.emit("data", id, data);
+        const command = JSON.parse(message);
+        this.emit("command", id, command);
+        const { action, data } = command;
         try {
-          switch (data.action) {
+          switch (action) {
             case "join":
               return await this.arena.join(id, data.game);
+            case "move":
+              return await this.arena.move(id, data.move);
             default:
-              return await this.arena.command(id, data);
+              throw new Error("invalid command");
           }
         } catch (err) {
           this.emit("error", err);
@@ -45,7 +49,7 @@ export default class Switch extends EventEmitter {
       });
 
       ws.on("close", async () => {
-        await this.close(id);
+        await this.close(id, "Player left the game.");
       });
     });
 
@@ -62,8 +66,8 @@ export default class Switch extends EventEmitter {
     }, process.env.WS_PING_TIMEOUT || 30000);
   }
 
-  async close(id) {
-    await this.arena.close(id);
+  async close(id, reason) {
+    await this.arena.close(id, reason);
     const ws = this.clients.get(id);
     if (ws) ws.close();
     this.clients.delete(id);

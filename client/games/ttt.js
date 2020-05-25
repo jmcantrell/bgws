@@ -1,33 +1,28 @@
-import Game from "/game.js";
+import GameClient from "/game.js";
+import * as game from "/lib/games/ttt.js";
 
-const ROWS = 3;
-const COLUMNS = 3;
-
-class TicTacToe extends Game {
+class TicTacToe extends GameClient {
   constructor() {
-    super("ttt");
+    super(game);
+
     this.addLayer("hints");
     this.addLayer("pieces");
     this.addLayer("board");
 
     this.elements.container.addEventListener("mousemove", (event) => {
-      if (!this.state || this.state.next != this.state.player) return;
-      const space = this.getSpace(event.offsetX, event.offsetY);
-      this.drawIndicator(space);
+      if (this.isMyTurn()) {
+        const space = this.getSpace(event.offsetX, event.offsetY);
+        this.drawHints(space);
+      }
     });
 
     this.elements.container.addEventListener("click", (event) => {
-      if (!this.state || this.state.next != this.state.player) return;
-      const space = this.getSpace(event.offsetX, event.offsetY);
-      if (!space) return;
-      const { row, column } = space;
-      if (this.state.board[row][column]) return;
-      this.showLoading("Waiting for turn.");
-      this.state.board[row][column] = this.state.player;
-      this.state.next = null;
-      this.drawPieces();
-      this.drawIndicator();
-      this.send({ action: "move", move: space });
+      if (this.isMyTurn()) {
+        const space = this.getSpace(event.offsetX, event.offsetY);
+        if (space && !game.getCell(this.state.board, space)) {
+          this.move(space);
+        }
+      }
     });
 
     this.draw();
@@ -37,17 +32,13 @@ class TicTacToe extends Game {
     super.draw();
     this.drawBoard();
     this.drawPieces();
+    this.drawHints();
     this.drawWinner();
   }
 
   resize() {
     const viewport = super.resize();
     this.setProperties(viewport);
-  }
-
-  update(state) {
-    super.update(state);
-    this.draw();
   }
 
   setProperties(viewport) {
@@ -61,42 +52,31 @@ class TicTacToe extends Game {
     const m = Math.trunc(min * 0.05);
     const margin = { top: m, bottom: m, left: m, right: m };
 
-    const aspectRatio = { width: COLUMNS, height: ROWS };
+    const aspectRatio = { width: game.columns, height: game.rows };
 
     // Get a box for the area of a canvas inside the margins.
-    const inner = Game.trimBox(viewport, margin);
+    const inner = GameClient.trimBox(viewport, margin);
 
     // Get a box that's evenly divisible by COLUMNS x ROWS.
-    const grid = Game.fitBox(inner, aspectRatio);
+    const grid = GameClient.fitBox(inner, aspectRatio);
+    grid.top = inner.top;
+    grid.left = GameClient.centerBoxHorizontal(inner, grid);
 
-    // Center that box in the inner canvas.
-    Object.assign(grid, Game.centerBox(inner, grid));
-
-    const cells = [];
-    const cellSize = grid.width / aspectRatio.width;
+    const cells = game.createGrid();
+    const cellSize = Math.trunc(grid.width / aspectRatio.width);
     const cellCenter = Math.trunc(cellSize / 2);
 
     // Calculate the coordinates of each space in the grid.
-    for (let row = 0; row < ROWS; row++) {
-      cells.push([]);
-      const top = grid.top + row * cellSize;
+    for (const space of game.getSpaces()) {
+      const left = grid.left + space.column * cellSize;
+      const top = grid.top + space.row * cellSize;
+      const cx = left + cellCenter;
       const cy = top + cellCenter;
-      for (let column = 0; column < COLUMNS; column++) {
-        const left = grid.left + column * cellSize;
-        const cx = left + cellCenter;
-        // Board is indexed from the bottom up.
-        cells[row].push({ top, left, cx, cy, column, row });
-      }
+      // Board is indexed from the bottom up.
+      game.setCell(cells, space, { top, left, cx, cy });
     }
 
-    this.properties = {
-      grid,
-      cells,
-      cellSize,
-      pieceRadius: Math.trunc(cellCenter * 0.5),
-      gridLineWidth: Math.trunc(cellCenter * 0.2),
-      pieceLineWidth: Math.trunc(cellCenter * 0.2),
-    };
+    this.properties = { grid, cells, cellSize };
   }
 
   getSpace(x, y) {
@@ -112,16 +92,27 @@ class TicTacToe extends Game {
     return null;
   }
 
+  getSize(scale) {
+    const { cellSize } = this.properties;
+    return Math.trunc(cellSize * scale);
+  }
+
+  getCell(space) {
+    const { cells } = this.properties;
+    return game.getCell(cells, space);
+  }
+
   drawBoard() {
+    if (!this.state) return;
     const canvas = this.elements.board;
     const context = canvas.getContext("2d");
-    const { grid, gridLineWidth, cellSize } = this.properties;
+    const { grid, cellSize } = this.properties;
 
     context.strokeStyle = "darkgrey";
-    context.lineWidth = gridLineWidth;
+    context.lineWidth = this.getSize(0.1);
 
     const right = grid.left + grid.width;
-    for (let row = 1; row < ROWS; row++) {
+    for (let row = 1; row < game.rows; row++) {
       const y = grid.top + row * cellSize;
       context.beginPath();
       context.moveTo(grid.left, y);
@@ -130,7 +121,7 @@ class TicTacToe extends Game {
     }
 
     const bottom = grid.top + grid.height;
-    for (let column = 1; column < COLUMNS; column++) {
+    for (let column = 1; column < game.columns; column++) {
       const x = grid.left + column * cellSize;
       context.beginPath();
       context.moveTo(x, grid.top);
@@ -143,15 +134,8 @@ class TicTacToe extends Game {
     if (!this.state) return;
     const canvas = this.elements.pieces;
     const context = canvas.getContext("2d");
-    const { cells } = this.properties;
-    for (let row = 0; row < ROWS; row++) {
-      for (let column = 0; column < COLUMNS; column++) {
-        const player = this.state.board[row][column];
-        if (player !== null) {
-          const cell = cells[row][column];
-          this.drawPiece(context, player, cell.cx, cell.cy);
-        }
-      }
+    for (const { space, piece } of game.getAllPieces(this.state.board)) {
+      this.drawPiece(context, space, piece.player);
     }
   }
 
@@ -160,54 +144,54 @@ class TicTacToe extends Game {
 
     const canvas = this.elements.hints;
     const context = canvas.getContext("2d");
-    Game.clearCanvas(canvas, context);
+    GameClient.clearCanvas(canvas, context);
 
-    const { winner, player } = this.state;
-    const { cellSize, cells } = this.properties;
+    const { winner } = this.state;
+    const { cellSize } = this.properties;
 
-    context.fillStyle = winner.player == player ? "darkgreen" : "darkred";
+    context.fillStyle = winner.player == this.player ? "darkgreen" : "darkred";
     for (const space of winner.line) {
-      const cell = cells[space.row][space.column];
+      const cell = this.getCell(space);
       context.fillRect(cell.left, cell.top, cellSize, cellSize);
     }
   }
 
-  drawIndicator(space = null) {
+  drawHints(space = null) {
     const canvas = this.elements.hints;
     const context = canvas.getContext("2d");
-    Game.clearCanvas(canvas, context);
+    GameClient.clearCanvas(canvas, context);
 
-    if (this.state.next != this.state.player || !space) return;
+    if (!space || !this.isMyTurn()) return;
 
-    const { row, column } = space;
-    const { player, board } = this.state;
+    const { board } = this.state;
 
-    if (board[row][column] !== null) return;
+    if (game.getCell(board, space)) return;
 
-    const { cellSize, cells } = this.properties;
-    const cell = cells[row][column];
+    const { cellSize } = this.properties;
+    const cell = this.getCell(space);
 
     context.fillStyle = "indigo";
     context.fillRect(cell.left, cell.top, cellSize, cellSize);
 
-    this.drawPiece(context, player, cell.cx, cell.cy);
+    this.drawPiece(context, space, this.player);
   }
 
-  drawPiece(context, player, x, y) {
+  drawPiece(context, space, player) {
+    const cell = this.getCell(space);
+    const r = this.getSize(0.25);
+    context.strokeStyle = "white";
+    context.lineWidth = this.getSize(0.1);
     switch (player) {
       case 0:
-        this.drawX(context, x, y);
+        this.drawX(context, cell.cx, cell.cy, r);
         break;
       case 1:
-        this.drawO(context, x, y);
+        this.drawO(context, cell.cx, cell.cy, r);
         break;
     }
   }
 
-  drawX(context, x, y) {
-    const r = this.properties.pieceRadius;
-    context.strokeStyle = "white";
-    context.lineWidth = this.properties.pieceLineWidth;
+  drawX(context, x, y, r) {
     context.beginPath();
     context.moveTo(x - r, y - r);
     context.lineTo(x + r, y + r);
@@ -218,10 +202,7 @@ class TicTacToe extends Game {
     context.stroke();
   }
 
-  drawO(context, x, y) {
-    const r = this.properties.pieceRadius;
-    context.strokeStyle = "white";
-    context.lineWidth = this.properties.pieceLineWidth;
+  drawO(context, x, y, r) {
     context.beginPath();
     context.ellipse(x, y, r, r, 0, 0, 2 * Math.PI);
     context.stroke();

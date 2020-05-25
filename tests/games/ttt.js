@@ -1,6 +1,7 @@
 import fs from "fs";
 import test from "ava";
-import TicTacToe from "../../server/games/ttt.js";
+import * as game from "../../lib/games/ttt.js";
+import { createMatch, addMove } from "../../server/match.js";
 
 import { fileURLToPath } from "url";
 import { join, dirname } from "path";
@@ -8,26 +9,27 @@ import { join, dirname } from "path";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const game = new TicTacToe();
-
 const filename = join(__dirname, `${game.id}.json`);
-const matches = JSON.parse(fs.readFileSync(filename));
-const move = matches[Object.keys(matches)[0]].moves[0];
-const match = game.createMatch();
+const matchData = fs.readFileSync(filename);
 
-const players = [];
-for (let i = 0; i < game.numPlayers; i++) {
-  players.push({ index: i });
-}
+test.beforeEach((t) => {
+  const matches = JSON.parse(matchData);
+  const players = [];
+  for (let i = 0; i < game.numPlayers; i++) {
+    players.push({ index: i });
+  }
+  t.context.match = createMatch(game, players);
+  t.context.players = players;
+  t.context.move = matches[Object.keys(matches)[0]].moves[0];
+});
 
 test(`${game.id}: no moves allowed after finish`, (t) => {
-  const match = game.createMatch();
+  const { match, players, move } = t.context;
   t.is(match.moves.length, 0);
-  match.finished = true;
-  const command = { action: "move", move };
+  match.state.finished = true;
   t.throws(
     () => {
-      game.command(match, players[0], command);
+      addMove(game, match, players[0], move);
     },
     { message: "match already finished" }
   );
@@ -35,15 +37,14 @@ test(`${game.id}: no moves allowed after finish`, (t) => {
 });
 
 test(`${game.id}: only one move per turn allowed`, (t) => {
-  const match = game.createMatch();
+  const { match, players, move } = t.context;
   t.is(match.moves.length, 0);
-  const command = { action: "move", move };
-  game.command(match, players[0], command);
+  addMove(game, match, players[0], move);
   t.is(match.moves.length, 1);
-  command.move.row = 1;
+  move.row = 1;
   t.throws(
     () => {
-      game.command(match, players[0], command);
+      addMove(game, match, players[0], move);
     },
     { message: "player already moved" }
   );
@@ -51,28 +52,27 @@ test(`${game.id}: only one move per turn allowed`, (t) => {
 });
 
 test(`${game.id}: only player one allowed to go first`, (t) => {
-  const match = game.createMatch();
+  const { match, players, move } = t.context;
   t.is(match.moves.length, 0);
-  const command = { action: "move", move };
   t.throws(
     () => {
-      game.command(match, players[1], command);
+      addMove(game, match, players[1], move);
     },
     { message: "only player one can move first" }
   );
   t.is(match.moves.length, 0);
-  game.command(match, players[0], command);
+  addMove(game, match, players[0], move);
   t.is(match.moves.length, 1);
 });
 
 test(`${game.id}: can only move if space isn't occupied`, (t) => {
+  const { match, players, move } = t.context;
   t.is(match.moves.length, 0);
-  const command = { action: "move", move };
-  game.command(match, players[0], command);
+  addMove(game, match, players[0], move);
   t.is(match.moves.length, 1);
   t.throws(
     () => {
-      game.command(match, players[1], command);
+      addMove(game, match, players[1], move);
     },
     { message: "space already occupied" }
   );

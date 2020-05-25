@@ -7,10 +7,9 @@
   "type": "module",
   "scripts": {
     "start": "concurrently 'npm:start-*'",
-    "start-web": "nodemon -w server web.js | pino-pretty -tc",
-    "start-lobby": "nodemon -w server lobby.js | pino-pretty -tc",
-    "test": "c8 --all ava -sv",
-    "test-dev": "ava -svw"
+    "start-web": "nodemon --signal SIGINT -w server -w lib web.js | pino-pretty -tc",
+    "start-lobby": "nodemon --signal SIGINT -w server -w lib lobby.js | pino-pretty -tc",
+    "test": "c8 --all ava -sv"
   },
   "keywords": [],
   "author": {

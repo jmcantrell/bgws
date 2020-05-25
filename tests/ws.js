@@ -1,10 +1,10 @@
 import fs from "fs";
+import glob from "glob";
 import test from "ava";
-import * as games from "../server/games.js";
 import * as server from "./_server.js";
 
 import { fileURLToPath } from "url";
-import { join, dirname } from "path";
+import { join, basename, dirname } from "path";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -17,10 +17,11 @@ test.afterEach.always(async (t) => {
   await server.close(t);
 });
 
-for (const id of Object.keys(games.metadata)) {
-  const filename = join(__dirname, "games", `${id}.json`);
-  if (!fs.existsSync(filename)) continue;
+const filenames = join(__dirname, "games", "*.json");
+for (const filename of glob.sync(filenames)) {
   const matches = JSON.parse(fs.readFileSync(filename));
+  const id = basename(filename, ".json");
+
   for (const [name, matchExpected] of Object.entries(matches)) {
     test.serial(`${id}: ${name}`, async (t) => {
       const game = t.context.app.games.get(id);
@@ -34,7 +35,7 @@ for (const id of Object.keys(games.metadata)) {
     return new Promise((resolve) => {
       ws1.on("open", async () => {
         setTimeout(async () => {
-          server.send(ws1, { action: "join", game: id });
+          server.send(ws1, { action: "join", data: { game: id } });
           await server.receive(ws1);
           server.send(ws1, { action: "bogus" });
           const update = await server.receive(ws1);
@@ -45,7 +46,7 @@ for (const id of Object.keys(games.metadata)) {
       });
       ws2.on("open", async () => {
         setTimeout(async () => {
-          server.send(ws2, { action: "join", game: id });
+          server.send(ws2, { action: "join", data: { game: id } });
           await server.receive(ws2);
           await server.receive(ws2);
           ws2.close();
@@ -73,22 +74,24 @@ test.serial("first command must be join", (t) => {
 
 async function waitForTurn(t, ws, playerIndex) {
   let ready = false;
-  let state;
+  let state, player;
+  // TODO: predict number of updates between turns
   while (!ready) {
     const command = await server.receive(ws);
+    player = command.player;
     state = command.state;
     t.truthy(state);
-    ready = state.next == state.player || state.finished;
+    ready = state.turn == player || state.finished;
   }
-  t.is(state.player, playerIndex);
+  t.is(player, playerIndex);
   return state;
 }
 
 async function testMatch(t, game, match) {
   t.context.game = game;
+  t.context.match = match;
   const sessions = [];
   let delay = 0;
-  t.context.match = match;
   for (let i = 0; i < game.numPlayers; i++) {
     const moves = match.moves.filter((move) => move.player == i);
     const ws = t.context.createWebSocket();
@@ -103,18 +106,18 @@ function testMatchSession(t, ws, moves, playerIndex, delay) {
   return new Promise((resolve) => {
     ws.on("open", async () => {
       setTimeout(async () => {
-        server.send(ws, { action: "join", game: game.id });
+        server.send(ws, { action: "join", data: { game: game.id } });
 
         let update = await waitForTurn(t, ws, playerIndex);
 
         for (const move of moves) {
           delete move.player;
           t.falsy(update.finished);
-          server.send(ws, { action: "move", move });
+          server.send(ws, { action: "move", data: { move } });
           update = await waitForTurn(t, ws, playerIndex);
         }
 
-        t.falsy(update.next);
+        t.falsy(update.turn);
         t.true(update.finished);
         t.deepEqual(update.winner, match.winner);
 

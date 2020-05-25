@@ -1,12 +1,13 @@
 import { v4 as uuid } from "uuid";
 import EventEmitter from "events";
+import { createMatch, addMove } from "./match.js";
 
 export default class Arena extends EventEmitter {
   constructor({ redis, games }) {
     super();
+
     this.redis = redis;
     this.games = games;
-
     this.channel = uuid();
 
     const subscriber = redis.duplicate();
@@ -26,25 +27,6 @@ export default class Arena extends EventEmitter {
     });
   }
 
-  nextPlayer() {
-    return new Promise((resolve, reject) => {
-      this.redis.brpop("joined", 0, (err, res) => {
-        if (err) return reject(err);
-        return resolve(res[1]);
-      });
-    });
-  }
-
-  sortPlayer(gameID, playerID) {
-    return new Promise((resolve, reject) => {
-      const waiting = `waiting:${gameID}`;
-      this.redis.lpush(waiting, playerID, (err, res) => {
-        if (err) return reject(err);
-        return resolve(res);
-      });
-    });
-  }
-
   async sortNextPlayer() {
     try {
       const playerID = await this.nextPlayer();
@@ -55,6 +37,25 @@ export default class Arena extends EventEmitter {
     } catch (err) {
       this.emit("error", err);
     }
+  }
+
+  nextPlayer() {
+    return new Promise((resolve, reject) => {
+      this.redis.brpop("joined", 0, (err, res) => {
+        if (err) return reject(err);
+        return resolve(res[1]);
+      });
+    });
+  }
+
+  sortPlayer(gameID, playerID) {
+    const waiting = `waiting:${gameID}`;
+    return new Promise((resolve, reject) => {
+      this.redis.lpush(waiting, playerID, (err, res) => {
+        if (err) return reject(err);
+        return resolve(res);
+      });
+    });
   }
 
   nextWaitingPlayer(gameID) {
@@ -86,17 +87,11 @@ export default class Arena extends EventEmitter {
         playerIDs.push(await this.nextWaitingPlayer(gameID));
       }
       const players = await this.getPlayers(playerIDs);
-      await this.createMatch(game, players);
+      await this.startMatch(game, players);
     }
   }
 
-  async createMatch(game, players) {
-    const match = game.createMatch();
-    match.id = uuid();
-    match.game = game.id;
-    match.start = Date.now();
-    match.players = [];
-
+  async startMatch(game, players) {
     // If any players disconnected before this point, their player data
     // will be missing, so re-queue the other players;
     if (players.includes(null)) {
@@ -105,18 +100,15 @@ export default class Arena extends EventEmitter {
       }
       return;
     }
+    const match = createMatch(game, players);
 
-    for (let i = 0; i < players.length; i++) {
-      const player = players[i];
-      player.index = i;
-      player.match = match.id;
-      match.players.push(player.id);
+    for (const player of players) {
       await this.savePlayer(player);
     }
+    await this.saveMatch(match);
+    await this.update(match, players);
 
     this.emit("match", game.id, match.id, match.players);
-    await this.saveMatch(match);
-    await this.updatePlayers(game, match, players);
   }
 
   async join(playerID, gameID) {
@@ -125,7 +117,7 @@ export default class Arena extends EventEmitter {
     await this.addPlayer(playerID);
   }
 
-  async command(playerID, command) {
+  async move(playerID, move) {
     const player = await this.getPlayer(playerID);
     if (!player) {
       throw new Error("unable to find player");
@@ -134,25 +126,22 @@ export default class Arena extends EventEmitter {
     if (!match) {
       throw new Error("unable to find match");
     }
-    const game = this.games.get(player.game);
-    game.command(match, player, command);
+    const game = this.games.get(match.game);
+    addMove(game, match, player, move);
     await this.saveMatch(match);
     const players = await this.getPlayers(match.players);
-    await this.updatePlayers(game, match, players);
+    await this.update(match, players);
   }
 
-  async close(playerID) {
+  async close(playerID, reason) {
     const player = await this.getPlayer(playerID);
     if (player) {
       if (player.match) {
         const match = await this.getMatch(player.match);
         if (match) {
-          if (!match.finished) {
+          if (!match.state.finished) {
             const players = await this.getPlayers(match.players);
-            const command = {
-              action: "end",
-              reason: `Player ${player.index + 1} left.`,
-            };
+            const command = { action: "end", reason };
             await this.broadcast(players, command);
           }
           await this.deleteMatch(match.id);
@@ -162,16 +151,12 @@ export default class Arena extends EventEmitter {
     }
   }
 
-  async updatePlayers(game, match, players) {
-    await Promise.all(
-      players.map((player) => {
-        const state = game.getState(match, player);
-        return this.send(player, { action: "update", state });
-      })
-    );
+  update(match, players) {
+    return this.broadcast(players, { action: "update", state: match.state });
   }
 
   send(player, command) {
+    command.player = player.index;
     const message = JSON.stringify({ id: player.id, data: command });
     return new Promise((resolve, reject) => {
       this.redis.publish(player.channel, message, (err, res) => {

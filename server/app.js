@@ -19,7 +19,8 @@ import { join, dirname } from "path";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const pkg = JSON.parse(fs.readFileSync(join(__dirname, "..", "package.json"), "utf8"));
+const root = join(__dirname, "..");
+const pkg = JSON.parse(fs.readFileSync(join(root, "package.json"), "utf8"));
 
 const port = process.env.PORT || 3000;
 const logLevel = process.env.LOG_LEVEL || "info";
@@ -37,7 +38,8 @@ app.locals.homepage = pkg.homepage;
 app.use(helmet());
 app.use(compression());
 app.use(pinoHttp({ logger }));
-app.use(express.static("client"));
+app.use(express.static(join(root, "client")));
+app.use('/lib', express.static(join(root, "lib")));
 
 app.get("/", (req, res) => {
   return res.render("index");
@@ -82,16 +84,16 @@ export async function startServer(redis = null) {
   app.server = http.createServer(app);
   app.switch = new Switch({ server: app.server, arena });
 
-  app.switch.on("connection", (id) => {
-    logger.info({ player: id }, "player connected");
+  app.switch.on("connection", (player) => {
+    logger.info({ player }, "player connected");
   });
 
-  app.switch.on("data", (id, data) => {
-    logger.debug({ player: id, command: data }, "player sent command");
+  app.switch.on("command", (player, command) => {
+    logger.debug({ player, command }, "player sent command");
   });
 
-  app.switch.on("disconnection", (id) => {
-    logger.info({ player: id }, "player disconnected");
+  app.switch.on("disconnection", (player) => {
+    logger.info({ player }, "player disconnected");
   });
 
   app.switch.on("error", (err) => {
@@ -113,7 +115,7 @@ export async function startServer(redis = null) {
     closing = true;
     logger.info("closing http server");
     for (const id of app.switch.clients.keys()) {
-      await app.switch.close(id);
+      await app.switch.close(id, "Server shutting down.");
     }
     app.server.close(() => {
       process.exit();

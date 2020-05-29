@@ -1,22 +1,25 @@
-import { v4 as uuid } from "uuid";
 import EventEmitter from "events";
 import { createMatch, addMove } from "./match.js";
 
 export default class Arena extends EventEmitter {
   constructor({ redis, games }) {
     super();
-
     this.redis = redis;
     this.games = games;
-    this.channel = uuid();
+  }
 
-    const subscriber = redis.duplicate();
-    subscriber.subscribe(this.channel);
-
-    subscriber.on("message", (channel, message) => {
-      const delivery = JSON.parse(message);
-      const { id, data } = delivery;
-      this.emit("message", id, data);
+  clear() {
+    return new Promise((resolve, reject) => {
+      this.redis.del("joined");
+      this.redis.del("players");
+      this.redis.del("matches");
+      this.redis.keys("waiting:*", (err, keys) => {
+        if (err) return reject(err);
+        for (const key of keys) {
+          this.redis.del(key);
+        }
+      });
+      return resolve();
     });
   }
 
@@ -32,8 +35,10 @@ export default class Arena extends EventEmitter {
       const playerID = await this.nextPlayer();
       const player = await this.getPlayer(playerID);
       if (!player) throw new Error("player disappeared");
-      await this.sortPlayer(player.game, playerID);
-      await this.checkWaiting(player.game);
+      const gameID = player.game;
+      await this.sortPlayer(gameID, playerID);
+      const players = await this.matchPlayers(gameID);
+      if (players) await this.startMatch(gameID, players);
     } catch (err) {
       this.emit("error", err);
     }
@@ -78,7 +83,7 @@ export default class Arena extends EventEmitter {
     });
   }
 
-  async checkWaiting(gameID) {
+  async matchPlayers(gameID) {
     const game = this.games.get(gameID);
     const count = await this.numWaitingPlayers(gameID);
     if (count >= game.numPlayers) {
@@ -86,12 +91,11 @@ export default class Arena extends EventEmitter {
       for (let i = 0; i < game.numPlayers; i++) {
         playerIDs.push(await this.nextWaitingPlayer(gameID));
       }
-      const players = await this.getPlayers(playerIDs);
-      await this.startMatch(game, players);
+      return await this.getPlayers(playerIDs);
     }
   }
 
-  async startMatch(game, players) {
+  async startMatch(gameID, players) {
     // If any players disconnected before this point, their player data
     // will be missing, so re-queue the other players;
     if (players.includes(null)) {
@@ -100,19 +104,18 @@ export default class Arena extends EventEmitter {
       }
       return;
     }
+    const game = this.games.get(gameID);
     const match = createMatch(game, players);
 
-    for (const player of players) {
-      await this.savePlayer(player);
-    }
+    await this.savePlayers(players);
     await this.saveMatch(match);
     await this.update(match, players);
 
     this.emit("match", game.id, match.id, match.players);
   }
 
-  async join(playerID, gameID) {
-    const player = { id: playerID, game: gameID, channel: this.channel };
+  async join(playerID, gameID, channel) {
+    const player = this.createPlayer(playerID, gameID, channel);
     await this.savePlayer(player);
     await this.addPlayer(playerID);
   }
@@ -133,7 +136,7 @@ export default class Arena extends EventEmitter {
     await this.update(match, players);
   }
 
-  async close(playerID, reason) {
+  async part(playerID, reason) {
     const player = await this.getPlayer(playerID);
     if (player) {
       if (player.match) {
@@ -157,7 +160,7 @@ export default class Arena extends EventEmitter {
 
   send(player, command) {
     command.player = player.index;
-    const message = JSON.stringify({ id: player.id, data: command });
+    const message = JSON.stringify({ id: player.id, command });
     return new Promise((resolve, reject) => {
       this.redis.publish(player.channel, message, (err, res) => {
         if (err) return reject(err);
@@ -198,6 +201,10 @@ export default class Arena extends EventEmitter {
     });
   }
 
+  createPlayer(playerID, gameID, channel) {
+    return { id: playerID, game: gameID, channel };
+  }
+
   addPlayer(playerID) {
     return new Promise((resolve, reject) => {
       this.redis.lpush("joined", playerID, (err, res) => {
@@ -216,8 +223,8 @@ export default class Arena extends EventEmitter {
     });
   }
 
-  async getPlayers(playerIDs) {
-    return await Promise.all(playerIDs.map((id) => this.getPlayer(id)));
+  getPlayers(playerIDs) {
+    return Promise.all(playerIDs.map((id) => this.getPlayer(id)));
   }
 
   savePlayer(player) {
@@ -228,6 +235,10 @@ export default class Arena extends EventEmitter {
         return resolve(res);
       });
     });
+  }
+
+  savePlayers(players) {
+    return Promise.all(players.map((player) => this.savePlayer(player)));
   }
 
   deletePlayer(playerID) {

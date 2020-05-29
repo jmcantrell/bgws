@@ -1,3 +1,8 @@
-import { startLobby } from "./server/app.js";
+import loadGames from "./server/games.js";
+import startLobby from "./server/lobby.js";
+import connectRedis from "./server/redis.js";
 
-startLobby();
+loadGames().then(async (games) => {
+  const redis = connectRedis();
+  await startLobby({ redis, games });
+});

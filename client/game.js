@@ -86,13 +86,13 @@ export default class GameClient {
   }
 
   join(game) {
-    this.send("join", { game });
+    this.send({ action: "join", game });
   }
 
   move(move) {
     this.showLoading("Waiting for turn.");
     this.state.turn = null;
-    this.send("move", { move });
+    this.send({ action: "move", move });
     this.draw();
   }
 
@@ -141,8 +141,7 @@ export default class GameClient {
     this.elements[id] = canvas;
   }
 
-  send(action, data) {
-    const command = { action, data };
+  send(command) {
     console.log("sending to server:", command);
     this.ws.send(JSON.stringify(command));
   }

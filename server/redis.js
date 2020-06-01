@@ -1,6 +1,15 @@
-import redis from "redis";
+import Redis from "ioredis";
 
-export default function connect(options = {}) {
-  const url = process.env.REDIS_URL || "redis://localhost:6379";
-  return redis.createClient(url, options);
+export function ready(client) {
+  return new Promise((resolve) => {
+    client.on("ready", () => {
+      return resolve(client);
+    });
+  });
+}
+
+export default async function connect(options = {}) {
+  const url = process.env.REDIS_URL;
+  const client = new Redis(url, options);
+  return await ready(client);
 }

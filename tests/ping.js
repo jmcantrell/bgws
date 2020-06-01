@@ -1,44 +1,40 @@
 import test from "ava";
-import * as server from "./_server.js";
-
-test.beforeEach(async (t) => {
-  await server.start(t);
-});
-
-test.afterEach.always(async (t) => {
-  await server.close(t);
-});
+import { startFakeWeb, connectWebSocket } from "./_setup.js";
 
 process.env.WS_PING_TIMEOUT = 100;
 
+test.before(async (t) => {
+  await startFakeWeb(t);
+});
+
 // Ensure a player is pinged.
 test.serial("websocket pong", (t) => {
-  const ws = t.context.createWebSocket();
-  const { wss } = t.context.app.switch;
+  const { sockets } = t.context.web;
+  const client = connectWebSocket(t);
   return new Promise((resolve) => {
-    ws.addEventListener("open", function () {
-      wss.clients.forEach((client) => {
-        client.on("pong", () => {
+    client.addEventListener("open", function () {
+      for (const ws of sockets.clients.values()) {
+        ws.on("pong", () => {
           t.pass();
           client.close();
           resolve();
         });
-      });
+      }
     });
   });
 });
 
 // Ensure a stale connection is terminated.
 test.serial("websocket timeout", (t) => {
-  const ws = t.context.createWebSocket();
-  const { wss } = t.context.app.switch;
+  const { sockets } = t.context.web;
+  const client = connectWebSocket(t);
   return new Promise((resolve) => {
-    ws.on("open", ()=> {
-      wss.clients.forEach((client) => {
-        client.active = false;
-      });
+    client.on("open", ()=> {
+      for (const ws of sockets.clients.values()) {
+        ws.active = false;
+      }
     });
-    ws.on("close", () => {
+    client.on("close", () => {
       t.pass();
       resolve();
     });

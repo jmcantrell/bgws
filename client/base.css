@@ -6,7 +6,7 @@ body {
   background-color: black;
   font-family: monospace;
   font-size: 2em;
-  text-align: center;
+  text-align: justify;
 }
 
 body, a, a:visited {
@@ -20,6 +20,7 @@ a:hover {
 header {
   color: white;
   margin: 0 1em;
+  text-align: center;
 }
 
 nav {

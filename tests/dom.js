@@ -1,16 +1,12 @@
 import test from "ava";
-import * as server from "./_server.js";
+import { startRealWeb, getDom } from "./_setup.js";
 
-test.beforeEach(async (t) => {
-  await server.start(t);
-});
-
-test.afterEach.always(async (t) => {
-  await server.close(t);
+test.before(async (t) => {
+  await startRealWeb(t);
 });
 
 test("404", async (t) => {
-  const dom = await server.getDom(t, "bogus", 404);
+  const dom = await getDom(t, "bogus", 404);
   const { document } = dom;
 
   // there is a breadcrumb trail
@@ -19,7 +15,7 @@ test("404", async (t) => {
 });
 
 test("/", async (t) => {
-  const dom = await server.getDom(t, "");
+  const dom = await getDom(t, "");
   const { document } = dom;
 
   // there is a link to the games
@@ -27,9 +23,9 @@ test("/", async (t) => {
 });
 
 test("/games/", async (t) => {
-  const dom = await server.getDom(t, "games/");
+  const { games } = t.context.web;
+  const dom = await getDom(t, "games/");
   const { document } = dom;
-  const { games } = t.context.app;
 
   // there is a breadcrumb trail
   t.truthy(document.querySelector("a[href='/']"));
@@ -42,10 +38,10 @@ test("/games/", async (t) => {
 });
 
 test("/games/:id/", async (t) => {
-  const { games } = t.context.app;
+  const { games } = t.context.web;
   for (const id of games.keys()) {
     const url = `games/${id}/`;
-    const dom = await server.getDom(t, url);
+    const dom = await getDom(t, url);
     const { document } = dom;
 
     // there is a breadcrumb trail

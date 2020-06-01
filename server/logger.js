@@ -1,3 +1,7 @@
 import pino from "pino";
-const logLevel = process.env.LOG_LEVEL || "info";
-export const logger = pino({ level: logLevel });
+
+export default function create(child = null) {
+  const level = process.env.LOG_LEVEL;
+  const logger = pino({ level });
+  return child ? logger.child(child) : logger;
+}

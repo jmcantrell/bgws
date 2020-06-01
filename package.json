@@ -23,12 +23,13 @@
     "express": "^4.17.1",
     "glob": "^7.1.6",
     "helmet": "^3.22.0",
-    "pino": "^6.2.1",
-    "pino-http": "^5.1.0",
-    "pug": "^2.0.4",
+    "ioredis": "^4.17.3",
+    "pino": "^6.3.1",
+    "pino-http": "^5.2.0",
+    "pug": "^3.0.0",
     "redis": "^3.0.2",
     "throng": "^4.0.0",
-    "uuid": "^8.0.0",
+    "uuid": "^8.1.0",
     "ws": "^7.3.0"
   },
   "optionalDependencies": {
@@ -39,16 +40,10 @@
     "ava": "^3.8.2",
     "c8": "^7.1.2",
     "concurrently": "^5.2.0",
-    "eslint": "^7.0.0",
+    "eslint": "^7.1.0",
     "got": "^11.1.4",
     "jsdom": "^16.2.2",
     "nodemon": "^2.0.4",
     "pino-pretty": "^4.0.0"
-  },
-  "ava": {
-    "environmentVariables": {
-      "PORT": "0",
-      "LOG_LEVEL": "silent"
-    }
   }
 }

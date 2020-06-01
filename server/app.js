@@ -2,7 +2,6 @@ import fs from "fs";
 import express from "express";
 import helmet from "helmet";
 import compression from "compression";
-import { logger } from "./logger.js";
 
 import { fileURLToPath } from "url";
 import { join, dirname } from "path";
@@ -13,7 +12,7 @@ const __dirname = dirname(__filename);
 const root = join(__dirname, "..");
 const pkg = JSON.parse(fs.readFileSync(join(root, "package.json"), "utf8"));
 
-export default function create({ games }) {
+export default function create({ games, logger }) {
   const app = express();
 
   app.set("view engine", "pug");

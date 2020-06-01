@@ -1,5 +1,5 @@
 import EventEmitter from "events";
-import { createMatch, addMove } from "./match.js";
+import { createPlayer, createMatch, addMove } from "../server/game.js";
 
 export default class Arena extends EventEmitter {
   constructor({ redis, games }) {
@@ -8,19 +8,13 @@ export default class Arena extends EventEmitter {
     this.games = games;
   }
 
-  clear() {
-    return new Promise((resolve, reject) => {
-      this.redis.del("joined");
-      this.redis.del("players");
-      this.redis.del("matches");
-      this.redis.keys("waiting:*", (err, keys) => {
-        if (err) return reject(err);
-        for (const key of keys) {
-          this.redis.del(key);
-        }
-      });
-      return resolve();
-    });
+  async clear() {
+    const keys = ["joined", "players", "matches"];
+    for (const gameID of this.games.keys()) {
+      keys.push(this.getQueue(gameID));
+    }
+    const deletes = keys.map((key) => this.redis.del(key));
+    return await Promise.all(deletes);
   }
 
   async listen() {
@@ -31,56 +25,35 @@ export default class Arena extends EventEmitter {
   }
 
   async sortNextPlayer() {
-    try {
-      const playerID = await this.nextPlayer();
-      const player = await this.getPlayer(playerID);
-      if (!player) throw new Error("player disappeared");
-      const gameID = player.game;
-      await this.sortPlayer(gameID, playerID);
-      const players = await this.matchPlayers(gameID);
-      if (players) await this.startMatch(gameID, players);
-    } catch (err) {
-      this.emit("error", err);
+    const playerID = await this.nextPlayer();
+    const player = await this.getPlayer(playerID);
+    if (player && player.game) {
+      await this.sortPlayer(player.game, playerID);
+      const players = await this.matchPlayers(player.game);
+      if (players) {
+        await this.startMatch(player.game, players);
+      }
     }
   }
 
-  nextPlayer() {
-    return new Promise((resolve, reject) => {
-      this.redis.brpop("joined", 0, (err, res) => {
-        if (err) return reject(err);
-        return resolve(res[1]);
-      });
-    });
+  async nextPlayer() {
+    const res = await this.redis.brpop("joined", 0);
+    return res[1];
   }
 
-  sortPlayer(gameID, playerID) {
-    const waiting = `waiting:${gameID}`;
-    return new Promise((resolve, reject) => {
-      this.redis.lpush(waiting, playerID, (err, res) => {
-        if (err) return reject(err);
-        return resolve(res);
-      });
-    });
+  async sortPlayer(gameID, playerID) {
+    const queue = this.getQueue(gameID);
+    return await this.redis.lpush(queue, playerID);
   }
 
-  nextWaitingPlayer(gameID) {
-    const waiting = `waiting:${gameID}`;
-    return new Promise((resolve, reject) => {
-      this.redis.rpop(waiting, (err, res) => {
-        if (err) return reject(err);
-        return resolve(res);
-      });
-    });
+  async nextWaitingPlayer(gameID) {
+    const queue = this.getQueue(gameID);
+    return await this.redis.rpop(queue);
   }
 
-  numWaitingPlayers(gameID) {
-    const waiting = `waiting:${gameID}`;
-    return new Promise((resolve, reject) => {
-      this.redis.llen(waiting, (err, res) => {
-        if (err) return reject(err);
-        return resolve(res);
-      });
-    });
+  async numWaitingPlayers(gameID) {
+    const queue = this.getQueue(gameID);
+    return await this.redis.llen(queue);
   }
 
   async matchPlayers(gameID) {
@@ -115,7 +88,10 @@ export default class Arena extends EventEmitter {
   }
 
   async join(playerID, gameID, channel) {
-    const player = this.createPlayer(playerID, gameID, channel);
+    if (!this.games.has(gameID)) {
+      throw new Error("game does not exist");
+    }
+    const player = createPlayer(playerID, gameID, channel);
     await this.savePlayer(player);
     await this.addPlayer(playerID);
   }
@@ -123,11 +99,14 @@ export default class Arena extends EventEmitter {
   async move(playerID, move) {
     const player = await this.getPlayer(playerID);
     if (!player) {
-      throw new Error("unable to find player");
+      throw new Error("player does not exist");
+    }
+    if (!player.match) {
+      throw new Error("player is not in a match");
     }
     const match = await this.getMatch(player.match);
     if (!match) {
-      throw new Error("unable to find match");
+      throw new Error("match does not exist");
     }
     const game = this.games.get(match.game);
     addMove(game, match, player, move);
@@ -145,7 +124,9 @@ export default class Arena extends EventEmitter {
           if (!match.state.finished) {
             const players = await this.getPlayers(match.players);
             const command = { action: "end", reason };
-            await this.broadcast(players, command);
+            for (const player of players) {
+              this.emit("command", player.channel, player.id, command);
+            }
           }
           await this.deleteMatch(match.id);
         }
@@ -155,98 +136,56 @@ export default class Arena extends EventEmitter {
   }
 
   update(match, players) {
-    return this.broadcast(players, { action: "update", state: match.state });
-  }
-
-  send(player, command) {
-    command.player = player.index;
-    const message = JSON.stringify({ id: player.id, command });
-    return new Promise((resolve, reject) => {
-      this.redis.publish(player.channel, message, (err, res) => {
-        if (err) return reject(err);
-        return resolve(res);
+    for (const player of players) {
+      this.emit("command", player.channel, player.id, {
+        action: "update",
+        player: player.index,
+        state: match.state,
       });
-    });
+    }
   }
 
-  broadcast(players, command) {
-    return Promise.all(players.map((p) => this.send(p, command)));
+  getQueue(gameID) {
+    return `waiting:${gameID}`;
   }
 
-  getMatch(matchID) {
-    return new Promise((resolve, reject) => {
-      this.redis.hget("matches", matchID, (err, res) => {
-        if (err) return reject(err);
-        return resolve(res ? JSON.parse(res) : null);
-      });
-    });
+  async getMatch(matchID) {
+    const value = await this.redis.hget("matches", matchID);
+    return value ? JSON.parse(value) : null;
   }
 
-  saveMatch(match) {
+  async saveMatch(match) {
     const value = JSON.stringify(match);
-    return new Promise((resolve, reject) => {
-      this.redis.hset("matches", match.id, value, (err, res) => {
-        if (err) return reject(err);
-        return resolve(res);
-      });
-    });
+    return await this.redis.hset("matches", match.id, value);
   }
 
-  deleteMatch(matchID) {
-    return new Promise((resolve, reject) => {
-      this.redis.hdel("matches", matchID, (err, res) => {
-        if (err) return reject(err);
-        return resolve(res);
-      });
-    });
+  async deleteMatch(matchID) {
+    return await this.redis.hdel("matches", matchID);
   }
 
-  createPlayer(playerID, gameID, channel) {
-    return { id: playerID, game: gameID, channel };
+  async addPlayer(playerID) {
+    return await this.redis.lpush("joined", playerID);
   }
 
-  addPlayer(playerID) {
-    return new Promise((resolve, reject) => {
-      this.redis.lpush("joined", playerID, (err, res) => {
-        if (err) return reject(err);
-        return resolve(res);
-      });
-    });
+  async getPlayer(playerID) {
+    const value = await this.redis.hget("players", playerID);
+    return value ? JSON.parse(value) : null;
   }
 
-  getPlayer(playerID) {
-    return new Promise((resolve, reject) => {
-      this.redis.hget("players", playerID, (err, res) => {
-        if (err) return reject(err);
-        return resolve(res ? JSON.parse(res) : null);
-      });
-    });
+  async getPlayers(playerIDs) {
+    return await Promise.all(playerIDs.map((id) => this.getPlayer(id)));
   }
 
-  getPlayers(playerIDs) {
-    return Promise.all(playerIDs.map((id) => this.getPlayer(id)));
-  }
-
-  savePlayer(player) {
+  async savePlayer(player) {
     const value = JSON.stringify(player);
-    return new Promise((resolve, reject) => {
-      this.redis.hset("players", player.id, value, (err, res) => {
-        if (err) return reject(err);
-        return resolve(res);
-      });
-    });
+    return await this.redis.hset("players", player.id, value);
   }
 
-  savePlayers(players) {
-    return Promise.all(players.map((player) => this.savePlayer(player)));
+  async savePlayers(players) {
+    return await Promise.all(players.map((player) => this.savePlayer(player)));
   }
 
-  deletePlayer(playerID) {
-    return new Promise((resolve, reject) => {
-      this.redis.hdel("players", playerID, (err, res) => {
-        if (err) return reject(err);
-        return resolve(res);
-      });
-    });
+  async deletePlayer(playerID) {
+    return await this.redis.hdel("players", playerID);
   }
 }

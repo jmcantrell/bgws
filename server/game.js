@@ -1,5 +1,9 @@
 import { v4 as uuid } from "uuid";
 
+export function createPlayer(playerID, gameID, channel) {
+  return { id: playerID, game: gameID, channel };
+}
+
 export function createMatch(game, players) {
   const match = {
     id: uuid(),
@@ -27,7 +31,7 @@ export function addMove(game, match, player, move) {
   if (match.moves.length == 0 && player.index > 0) {
     throw new Error("only player one can move first");
   }
-  if (match.moves.length > 0) {
+  if (match.moves.length > 0 && game.numPlayers > 1) {
     const last = match.moves[match.moves.length - 1];
     if (last.player == player.index) {
       throw new Error("player already moved");

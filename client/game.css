@@ -24,6 +24,7 @@ main {
   padding: 1em;
   border: 10px solid white;
   color: white;
+  text-align: center;
   background-color: darkblue;
   border-radius: 0.2em;
   box-shadow: 0 0 1em 0 rgba(255,255,255,1);

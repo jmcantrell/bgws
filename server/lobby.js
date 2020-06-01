@@ -1,25 +1,39 @@
+import EventEmitter from "events";
 import Arena from "./arena.js";
-import { logger } from "./logger.js";
+import Conduit from "./conduit.js";
 
-export default async function start({ redis, games }) {
-  const arena = new Arena({ redis, games });
+export default class Lobby extends EventEmitter {
+  constructor({ redis, games, logger }) {
+    super();
 
-  arena.on("match", (game, match, players) => {
-    logger.info({ game, match, players }, "match started");
-  });
+    this.redis = redis;
+    this.games = games;
+    this.logger = logger;
 
-  arena.on("error", (err) => {
-    logger.error(err);
-  });
+    this.arena = new Arena({ redis: this.redis, games: this.games });
+    this.conduit = new Conduit({ redis: this.redis });
 
-  logger.info("waiting for players");
+    this.arena.on("match", (game, match, players) => {
+      this.logger.info({ game, match, players }, "match started");
+    });
 
-  await arena.clear();
-  await arena.listen();
+    this.arena.on("command", (channel, player, command) => {
+      this.logger.trace({ channel, player, command }, "sending command");
+      this.conduit.send(channel, player, command);
+    });
 
-  async function close() {
-    await arena.close();
+    this.arena.on("error", (err) => {
+      this.logger.error(err);
+    });
   }
 
-  return close;
+  async listen() {
+    this.logger.info("waiting for players");
+    await this.arena.clear();
+    await this.arena.listen();
+  }
+
+  async close() {
+    await this.arena.close();
+  }
 }

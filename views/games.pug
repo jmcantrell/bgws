@@ -2,8 +2,7 @@ extends base
 
 block main
   each game in games
-    div(style="text-align:left")
-      p
-        a(href=`/games/${game.id}/`)
-          h2= game.name
-      p !{game.description}
+    p
+      a(href=`/games/${game.id}/`)
+        h2= game.name
+    p !{game.description}

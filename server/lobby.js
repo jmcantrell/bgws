@@ -13,17 +13,13 @@ export default class Lobby extends EventEmitter {
     this.arena = new Arena({ redis: this.redis, games: this.games });
     this.conduit = new Conduit({ redis: this.redis });
 
-    this.arena.on("match", (game, match, players) => {
-      this.logger.info({ game, match, players }, "match started");
+    this.arena.on("match", (game, match, clients) => {
+      this.logger.info({ game, match, clients }, "match started");
     });
 
-    this.arena.on("command", (channel, player, command) => {
-      this.logger.trace({ channel, player, command }, "sending command");
-      this.conduit.send(channel, player, command);
-    });
-
-    this.arena.on("error", (err) => {
-      this.logger.error(err);
+    this.arena.on("command", async (channel, client, command) => {
+      this.logger.trace({ channel, client, command }, "sending command");
+      await this.conduit.send(channel, client, command);
     });
   }
 

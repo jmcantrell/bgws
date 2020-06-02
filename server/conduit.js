@@ -19,13 +19,8 @@ export default class Conduit extends EventEmitter {
     });
   }
 
-  send(channel, id, command) {
+  async send(channel, id, command) {
     const message = JSON.stringify({ id, command });
-    return new Promise((resolve, reject) => {
-      this.redis.publish(channel, message, (err, res) => {
-        if (err) return reject(err);
-        return resolve(res);
-      });
-    });
+    await this.redis.publish(channel, message);
   }
 }

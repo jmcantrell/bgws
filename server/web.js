@@ -1,7 +1,7 @@
 import http from "http";
 import EventEmitter from "events";
-import Arena from "./arena.js";
 import createApp from "./app.js";
+import Arena from "./arena.js";
 import Conduit from "./conduit.js";
 import Sockets from "./sockets.js";
 
@@ -25,11 +25,7 @@ export default class Web extends EventEmitter {
 
     this.sockets.on("disconnect", async (client) => {
       this.logger.info({ client }, "player disconnected");
-      try {
-        await this.arena.part(client, "Player left the game.");
-      } catch (err) {
-        logger.error(err);
-      }
+      await this.arena.part(client, "Player left the game.");
     });
 
     this.sockets.on("command", async (client, command) => {
@@ -53,9 +49,9 @@ export default class Web extends EventEmitter {
       }
     });
 
-    this.arena.on("command", (channel, client, command) => {
+    this.arena.on("command", async (channel, client, command) => {
       this.logger.trace({ channel, client, command }, "relaying command");
-      this.conduit.send(channel, client, command);
+      await this.conduit.send(channel, client, command);
     });
 
     this.conduit.on("command", (client, command) => {
@@ -69,8 +65,7 @@ export default class Web extends EventEmitter {
   }
 
   listen() {
-    const port = process.env.PORT || 3000;
-    this.server.listen(port, async () => {
+    this.server.listen(process.env.PORT, async () => {
       const { port } = this.server.address();
       this.logger.info({ port }, "http server listening");
     });

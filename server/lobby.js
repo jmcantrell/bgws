@@ -32,8 +32,4 @@ export default class Lobby extends EventEmitter {
     await this.arena.clear();
     await this.arena.listen();
   }
-
-  async close() {
-    await this.arena.close();
-  }
 }

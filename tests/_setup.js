@@ -42,36 +42,46 @@ export function connectTestRedis() {
   return connectRedis({ db: 1 });
 }
 
-export async function startWeb(t, options) {
+export async function createWeb(options) {
   options.redis = await connectTestRedis();
   options.logger = createLogger({ name: "web" });
   const web = new Web(options);
   await web.listen();
-  t.context.web = web;
+  return web;
 }
 
-export async function startLobby(t, options) {
+export async function createLobby(options) {
   options.redis = await connectTestRedis();
   options.logger = createLogger({ name: "lobby" });
   const lobby = new Lobby(options);
   await lobby.listen();
-  t.context.lobby = lobby;
+  return lobby;
 }
 
-export async function startRealWeb(t) {
-  await startWeb(t, { games: await loadGames() });
+export async function createRealWeb() {
+  return await createWeb({ games: await loadGames() });
 }
 
-export async function startRealLobby(t) {
-  await startLobby(t, { games: await loadGames() });
+export async function createRealLobby() {
+  return await createLobby({ games: await loadGames() });
 }
 
-export async function startFakeWeb(t) {
-  await startWeb(t, { games: fakeGames });
+export async function createFakeWeb() {
+  return await createWeb({ games: fakeGames });
 }
 
-export async function startFakeLobby(t) {
-  await startLobby(t, { games: fakeGames });
+export async function createFakeLobby() {
+  return await createLobby({ games: fakeGames });
+}
+
+export function connect(server) {
+  const { port } = server.address();
+  const ws = new WebSocket(`ws://localhost:${port}`);
+  return new Promise((resolve) => {
+    ws.on("open", () => {
+      return resolve(ws);
+    });
+  });
 }
 
 export function send(ws, message) {
@@ -83,22 +93,13 @@ export async function receive(ws) {
   return JSON.parse(events[0].data);
 }
 
-export async function getDom(t, path, status = 200) {
-  const res = await get(t, path, status);
+export function getDocument(res) {
   const dom = new jsdom.JSDOM(res.body);
-  dom.document = dom.window.document;
-  return dom;
+  return dom.window.document;
 }
 
-export async function get(t, path, status = 200) {
-  const { port } = t.context.web.server.address();
+export async function getResponse(server, path) {
+  const { port } = server.address();
   const prefixUrl = `http://localhost:${port}`;
-  const res = await got(path, { prefixUrl, throwHttpErrors: false });
-  t.is(res.statusCode, status);
-  return res;
-}
-
-export function connectWebSocket(t) {
-  const { port } = t.context.web.server.address();
-  return new WebSocket(`ws://localhost:${port}`);
+  return await got(path, { prefixUrl, throwHttpErrors: false });
 }

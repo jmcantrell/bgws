@@ -91,6 +91,9 @@ export default class Arena extends EventEmitter {
     if (!this.games.has(gameID)) {
       throw new Error("game does not exist");
     }
+    if (await this.getPlayer(playerID)) {
+      throw new Error("player has already joined a game");
+    }
     const player = createPlayer(playerID, gameID, channel);
     await this.savePlayer(player);
     await this.addPlayer(playerID);

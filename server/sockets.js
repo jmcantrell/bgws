@@ -31,17 +31,14 @@ export default class Sockets extends EventEmitter {
 
       ws.on("close", () => {
         this.emit("disconnect", id);
-        this.clients.delete(id);
       });
     });
 
     // This will terminate inactive websocket connections.
-    setInterval(() => {
+    setInterval(async () => {
       for (const [id, ws] of this.clients.entries()) {
         if (!ws.active) {
-          this.emit("disconnect", id);
-          this.clients.delete(id);
-          return ws.terminate();
+          await this.disconnect(id);
         }
         ws.active = false;
         ws.ping();
@@ -57,7 +54,13 @@ export default class Sockets extends EventEmitter {
 
   async disconnect(id) {
     const ws = this.clients.get(id);
-    if (ws) ws.close();
+    if (ws && ws.readyState == WebSocket.OPEN) {
+      await new Promise((resolve) => {
+        ws.close();
+        ws.once("close", resolve);
+      });
+    }
+    this.clients.delete(id);
   }
 
   send(id, command) {

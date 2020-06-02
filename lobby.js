@@ -7,5 +7,6 @@ loadGames().then(async (games) => {
   const redis = await connectRedis();
   const logger = createLogger({ name: "lobby" });
   const lobby = new Lobby({ redis, games, logger });
+
   await lobby.listen();
 });

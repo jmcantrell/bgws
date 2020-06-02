@@ -44,8 +44,11 @@ export function addMove(game, match, player, move) {
   move.player = player.index;
   match.moves.push(move);
 
-  state.winner = game.getWinner(state, player.index, move);
-  state.finished = Boolean(state.winner) || game.isDraw(state, player.index, move);
+  const winner = game.getWinner(state, player.index, move);
+  if (winner) state.winner = winner;
+
+  const finished = Boolean(winner) || game.isDraw(state, player.index, move);
+  if (finished) state.finished = finished;
 
   const turn = (player.index + 1) % game.numPlayers;
   state.turn = state.finished ? null : turn;

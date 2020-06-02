@@ -1,5 +1,5 @@
 import test from "ava";
-import { createFakeWeb, connect } from "./_setup.js";
+import { createFakeWeb, connect } from "../_setup.js";
 
 process.env.WS_PING_TIMEOUT = 100;
 

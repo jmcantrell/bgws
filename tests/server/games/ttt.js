@@ -1,6 +1,6 @@
 import test from "ava";
-import * as game from "../../lib/games/ttt.js";
-import { createMatch, addMove } from "../../server/game.js";
+import * as game from "../../../lib/games/ttt.js";
+import { createMatch, addMove } from "../../../server/game.js";
 
 test.beforeEach((t) => {
   const players = [];

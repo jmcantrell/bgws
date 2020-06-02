@@ -1,7 +1,7 @@
 import test from "ava";
-import Arena from "../server/arena.js";
-import { connectTestRedis, fakeGames } from "./_setup.js";
-import { createPlayer, createMatch } from "../server/game.js";
+import Arena from "../../server/arena.js";
+import { connectTestRedis, fakeGames } from "../_setup.js";
+import { createPlayer, createMatch } from "../../server/game.js";
 
 function* getPlayers(game) {
   for (let i = 0; i < game.numPlayers; i++) {

@@ -1,6 +1,6 @@
 import test from "ava";
-import { createFakeGame, fakeGames } from "./_setup.js";
-import { createPlayer, createMatch, addMove } from "../server/game.js";
+import { createFakeGame, fakeGames } from "../_setup.js";
+import { createPlayer, createMatch, addMove } from "../../server/game.js";
 
 function* getPlayers(game) {
   for (let i = 0; i < game.numPlayers; i++) {

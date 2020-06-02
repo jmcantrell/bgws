@@ -6,7 +6,7 @@ import {
   connect,
   send,
   receive,
-} from "./_setup.js";
+} from "../_setup.js";
 
 test.before(async (t) => {
   t.context.web = await createFakeWeb();

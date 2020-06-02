@@ -1,7 +1,7 @@
 import test from "ava";
-import { connectTestRedis } from "./_setup.js";
-import Conduit from "../server/conduit.js";
-import { ready as redisReady } from "../server/redis.js";
+import { connectTestRedis } from "../_setup.js";
+import Conduit from "../../server/conduit.js";
+import { ready as redisReady } from "../../server/redis.js";
 
 test("one conduit can communicate with another", async (t) => {
   const hello1 = { message: "hello from conduit1" };

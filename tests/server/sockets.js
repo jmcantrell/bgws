@@ -1,10 +1,10 @@
 import test from "ava";
 import http from "http";
 import WebSocket from "ws";
-import { fakeGames } from "./_setup.js";
-import createApp from "../server/app.js";
-import createLogger from "../server/logger.js";
-import Sockets from "../server/sockets.js";
+import { fakeGames } from "../_setup.js";
+import createApp from "../../server/app.js";
+import createLogger from "../../server/logger.js";
+import Sockets from "../../server/sockets.js";
 
 test.beforeEach(async (t) => {
   const games = fakeGames;

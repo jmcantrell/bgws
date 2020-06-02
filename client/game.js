@@ -1,7 +1,7 @@
-const WEBSOCKET_URL = location.origin.replace(/^http/, "ws");
+import { resize as resizeCanvas } from "/lib/canvas.js";
 
-export default class GameClient {
-  constructor(game) {
+export default class GameClientBase {
+  constructor({ url, game }) {
     this.game = game;
     this.player = null;
     this.layers = [];
@@ -23,7 +23,7 @@ export default class GameClient {
 
     this.spinnerInterval = null;
 
-    this.ws = new WebSocket(WEBSOCKET_URL);
+    this.ws = new WebSocket(url);
 
     this.ws.addEventListener("error", (error) => {
       console.error("websocket error", error);
@@ -114,7 +114,7 @@ export default class GameClient {
       height: clientHeight,
     };
     for (const canvas of this.layers) {
-      GameClient.resizeCanvas(canvas, viewport);
+      resizeCanvas(canvas, viewport);
     }
     return viewport;
   }
@@ -181,55 +181,5 @@ export default class GameClient {
   hideDialogs() {
     this.hideMessage();
     this.hideLoading();
-  }
-
-  static clearCanvas(canvas, context) {
-    const { width, height } = canvas;
-    context.clearRect(0, 0, width, height);
-  }
-
-  static resizeCanvas(canvas, box) {
-    const { width, height } = box;
-    canvas.style.width = `${width}px`;
-    canvas.style.height = `${height}px`;
-    canvas.width = width;
-    canvas.height = height;
-  }
-
-  static trimBox(box, margin) {
-    const trimmed = {
-      top: box.top + margin.top,
-      left: box.left + margin.left,
-      width: box.width - margin.left - margin.right,
-      height: box.height - margin.top - margin.bottom,
-    };
-    trimmed.bottom = trimmed.top + trimmed.height;
-    trimmed.right = trimmed.left + trimmed.width;
-    return trimmed;
-  }
-
-  // Returns dimensions for a rectangle with the same aspect ratio as
-  // `child` that fits maximally in `parent`.
-  static fitBox(parent, child) {
-    let width, height;
-    if (parent.width / parent.height < child.width / child.height) {
-      height = Math.trunc(parent.width / child.width) * child.height;
-      width = (height / child.height) * child.width;
-      return { width, height };
-    } else {
-      width = Math.trunc(parent.height / child.height) * child.width;
-      height = (width / child.width) * child.height;
-    }
-    return { width, height };
-  }
-
-  // Returns top value that centers `child` within `parent` vertically.
-  static centerBoxVertical(parent, child) {
-    return parent.top + Math.trunc(parent.height / 2 - child.height / 2);
-  }
-
-  // Returns left value that centers `child` within `parent` horizontally.
-  static centerBoxHorizontal(parent, child) {
-    return parent.left + Math.trunc(parent.width / 2 - child.width / 2);
   }
 }

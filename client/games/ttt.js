@@ -1,9 +1,11 @@
-import GameClient from "/game.js";
+import GameClientBase from "/game.js";
+import * as rect from "/lib/rect.js";
 import * as game from "/lib/games/ttt.js";
+import { clear as clearCanvas } from "/lib/canvas.js";
 
-class TicTacToe extends GameClient {
-  constructor() {
-    super(game);
+export default class GameClient extends GameClientBase {
+  constructor({ url }) {
+    super({ url, game });
 
     this.addLayer("hints");
     this.addLayer("pieces");
@@ -55,12 +57,12 @@ class TicTacToe extends GameClient {
     const aspectRatio = { width: game.columns, height: game.rows };
 
     // Get a box for the area of a canvas inside the margins.
-    const inner = GameClient.trimBox(viewport, margin);
+    const inner = rect.trim(viewport, margin);
 
     // Get a box that's evenly divisible by COLUMNS x ROWS.
-    const grid = GameClient.fitBox(inner, aspectRatio);
+    const grid = rect.fit(inner, aspectRatio);
     grid.top = inner.top;
-    grid.left = GameClient.centerBoxHorizontal(inner, grid);
+    grid.left = rect.getCenterHorizontal(inner, grid);
 
     const cells = game.createGrid();
     const cellSize = Math.trunc(grid.width / aspectRatio.width);
@@ -144,7 +146,7 @@ class TicTacToe extends GameClient {
 
     const canvas = this.elements.hints;
     const context = canvas.getContext("2d");
-    GameClient.clearCanvas(canvas, context);
+    clearCanvas(canvas, context);
 
     const { winner } = this.state;
     const { cellSize } = this.properties;
@@ -159,7 +161,7 @@ class TicTacToe extends GameClient {
   drawHints(space = null) {
     const canvas = this.elements.hints;
     const context = canvas.getContext("2d");
-    GameClient.clearCanvas(canvas, context);
+    clearCanvas(canvas, context);
 
     if (!space || !this.isMyTurn()) return;
 
@@ -208,5 +210,3 @@ class TicTacToe extends GameClient {
     context.stroke();
   }
 }
-
-window.addEventListener("load", () => new TicTacToe());

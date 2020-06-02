@@ -4,7 +4,10 @@ block links
   link(rel="stylesheet", href="/game.css")
 
 block scripts
-  script(type="module", src=`/games/${id}.js`)
+  script(type="module").
+    import GameClient from "/games/#{id}.js";
+    const WEBSOCKET_URL = location.origin.replace(/^http/, "ws");
+    window.addEventListener("load", () => new GameClient({ url: WEBSOCKET_URL }));
 
 block body
 

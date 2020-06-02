@@ -1,11 +1,13 @@
-import GameClient from "/game.js";
+import GameClientBase from "/game.js";
+import * as rect from "/lib/rect.js";
 import * as game from "/lib/games/c4.js";
+import { clear as clearCanvas } from "/lib/canvas.js";
 
 const colors = ["gold", "darkred"];
 
-class ConnectFour extends GameClient {
-  constructor() {
-    super(game);
+export default class GameClient extends GameClientBase {
+  constructor({ url }) {
+    super({ url, game });
 
     this.addLayer("pieces");
     this.addLayer("hints");
@@ -63,26 +65,26 @@ class ConnectFour extends GameClient {
     const aspectRatio = { width: game.columns, height: game.rows };
 
     // Get a box for the area of a canvas inside the margins.
-    const inner = GameClient.trimBox(viewport, margin);
+    const inner = rect.trim(viewport, margin);
 
     // Get a box that's evenly divisible by COLUMNS x ROWS.
-    const frame = GameClient.fitBox(inner, aspectRatio);
+    const frame = rect.fit(inner, aspectRatio);
     frame.top = inner.top;
 
     // Center that box in the inner canvas.
-    frame.left = GameClient.centerBoxHorizontal(inner, frame);
+    frame.left = rect.getCenterHorizontal(inner, frame);
 
     // Grid is another box with the right aspect ratio, but shrunk.
     const padding = Math.trunc(min * 0.01);
-    const grid = GameClient.fitBox(
+    const grid = rect.fit(
       {
         width: frame.width - padding * 2,
         height: frame.height - padding * 2,
       },
       aspectRatio
     );
-    grid.top = GameClient.centerBoxVertical(frame, grid);
-    grid.left = GameClient.centerBoxHorizontal(frame, grid);
+    grid.top = rect.getCenterVertical(frame, grid);
+    grid.left = rect.getCenterHorizontal(frame, grid);
 
     const cells = game.createGrid();
     const bottom = grid.top + grid.height;
@@ -164,7 +166,7 @@ class ConnectFour extends GameClient {
   drawHints(space = null) {
     const canvas = this.elements.hints;
     const context = canvas.getContext("2d");
-    GameClient.clearCanvas(canvas, context);
+    clearCanvas(canvas, context);
 
     if (!space || !this.isMyTurn()) return;
 
@@ -211,7 +213,7 @@ class ConnectFour extends GameClient {
 
     const canvas = this.elements.hints;
     const context = canvas.getContext("2d");
-    GameClient.clearCanvas(canvas, context);
+    clearCanvas(canvas, context);
 
     const { winner } = this.state;
 
@@ -243,5 +245,3 @@ class ConnectFour extends GameClient {
     context.stroke();
   }
 }
-
-window.addEventListener("load", () => new ConnectFour());

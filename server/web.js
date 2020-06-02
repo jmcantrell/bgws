@@ -25,7 +25,11 @@ export default class Web extends EventEmitter {
 
     this.sockets.on("disconnect", async (client) => {
       this.logger.info({ client }, "player disconnected");
-      await this.arena.part(client, "Player left the game.");
+      try {
+        await this.arena.part(client, "Player left the game.");
+      } catch (err) {
+        logger.error(err);
+      }
     });
 
     this.sockets.on("command", async (client, command) => {
@@ -50,12 +54,12 @@ export default class Web extends EventEmitter {
     });
 
     this.arena.on("command", (channel, client, command) => {
-      this.logger.trace({ channel, client, command }, "sending command");
+      this.logger.trace({ channel, client, command }, "relaying command");
       this.conduit.send(channel, client, command);
     });
 
     this.conduit.on("command", (client, command) => {
-      this.logger.trace({ client, command }, "relaying command");
+      this.logger.trace({ client, command }, "sending command to client");
       this.sockets.send(client, command);
     });
 
@@ -73,8 +77,9 @@ export default class Web extends EventEmitter {
   }
 
   async close() {
+    const command = { action: "end", reason: "Server shutting down." };
     for (const id of this.sockets.clients.keys()) {
-      await this.arena.part(id, "Server shutting down.");
+      this.sockets.send(id, command);
     }
     await this.sockets.close();
     await new Promise((resolve) => {

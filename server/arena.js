@@ -125,10 +125,12 @@ export default class Arena extends EventEmitter {
         const match = await this.getMatch(player.match);
         if (match) {
           if (!match.state.finished) {
-            const players = await this.getPlayers(match.players);
             const command = { action: "end", reason };
+            const players = await this.getPlayers(match.players);
             for (const player of players) {
-              this.emit("command", player.channel, player.id, command);
+              if (player) {
+                this.emit("command", player.channel, player.id, command);
+              }
             }
           }
           await this.deleteMatch(match.id);

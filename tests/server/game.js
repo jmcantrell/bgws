@@ -1,12 +1,10 @@
 import test from "ava";
-import { createFakeGame, fakeGames } from "../_setup.js";
 import { createPlayer, createMatch, addMove } from "../../server/game.js";
-
-function* getPlayers(game) {
-  for (let i = 0; i < game.numPlayers; i++) {
-    yield { id: `player-${game.id}-${i}` };
-  }
-}
+import {
+  createFakeGame,
+  createFakeGames,
+  createFakePlayers,
+} from "../_setup.js";
 
 test("able to create a player object", (t) => {
   const playerID = "player0";
@@ -19,9 +17,10 @@ test("able to create a player object", (t) => {
 });
 
 test("able to create a match object", (t) => {
+  const games = createFakeGames();
   // Ensure logic works for any number of players.
-  for (const game of fakeGames.values()) {
-    const players = Array.from(getPlayers(game));
+  for (const game of games.values()) {
+    const players = createFakePlayers(game);
     const playerIDs = players.map((player) => player.id);
     const ts = Date.now();
     const match = createMatch(game, players);
@@ -42,7 +41,7 @@ test("able to create a match object", (t) => {
     t.is(match.moves.length, 0);
 
     // Has the correct game state.
-    t.deepEqual(match.state, game.createState());
+    t.deepEqual(match.state.board, game.createBoard());
 
     for (let i = 0; i < game.numPlayers; i++) {
       const player = players[i];
@@ -57,8 +56,8 @@ test("able to create a match object", (t) => {
 });
 
 test("no moves allowed after finish", (t) => {
-  const game = fakeGames.get("fake1p");
-  const players = Array.from(getPlayers(game));
+  const game = createFakeGame("fake");
+  const players = createFakePlayers(game);
   const match = createMatch(game, players);
 
   // Simulate a match-ending event.
@@ -76,8 +75,8 @@ test("no moves allowed after finish", (t) => {
 
 test("only one move per turn allowed", (t) => {
   // Need at least two players for this exception to be visible.
-  const game = fakeGames.get("fake2p");
-  const players = Array.from(getPlayers(game));
+  const game = createFakeGame("fake", 2);
+  const players = createFakePlayers(game);
   const match = createMatch(game, players);
 
   // Everything is normal so far.
@@ -96,8 +95,8 @@ test("only one move per turn allowed", (t) => {
 
 test("only player one allowed to go first", (t) => {
   // Need at least two players to be able to test this exception.
-  const game = fakeGames.get("fake2p");
-  const players = Array.from(getPlayers(game));
+  const game = createFakeGame("fake", 2);
+  const players = createFakePlayers(game);
   const match = createMatch(game, players);
 
   // Any player other than player one will throw an error.
@@ -116,13 +115,13 @@ test("only player one allowed to go first", (t) => {
 
 test("able to add move to a match", (t) => {
   const game = createFakeGame("fake");
-  const player = { id: "player0" };
-  const match = createMatch(game, [player]);
+  const players = createFakePlayers(game);
+  const match = createMatch(game, players);
 
   // Ensure the obvious.
   t.is(match.moves.length, 0);
 
-  addMove(game, match, player, { test: true });
+  addMove(game, match, players[0], { test: true });
 
   // Ensure move was added.
   t.is(match.moves.length, 1);
@@ -132,13 +131,14 @@ test("able to add move to a match", (t) => {
   t.true(lastMove.test);
 
   // Move should be tagged with the player.
-  t.is(lastMove.player, player.index);
+  t.is(lastMove.player, players[0].index);
 });
 
 test("adding a move sets the next player's turn", (t) => {
+  const games = createFakeGames();
   // Ensure logic works for any number of players.
-  for (const game of fakeGames.values()) {
-    const players = Array.from(getPlayers(game));
+  for (const game of games.values()) {
+    const players = createFakePlayers(game);
     const match = createMatch(game, players);
 
     // Add a move for each player.
@@ -155,28 +155,28 @@ test("adding a move sets the next player's turn", (t) => {
 
 test("match will end if there's a draw", (t) => {
   const game = createFakeGame("fake");
-  const player = { id: "player0" };
-  const match = createMatch(game, [player]);
+  const players = createFakePlayers(game);
+  const match = createMatch(game, players);
   const move = { fake: true };
 
   // Ensure the obvious.
   t.falsy(match.state.finished);
 
   // Fake games never find a draw, unless...
-  addMove(game, match, player, move);
+  addMove(game, match, players[0], move);
   t.falsy(match.state.finished);
 
   // The right method is overridden.
   // Next move will trigger a draw.
   game.isDraw = () => true;
-  addMove(game, match, player, move);
+  addMove(game, match, players[0], move);
   t.true(match.state.finished);
 });
 
 test("match will end if there's a winner", (t) => {
   const game = createFakeGame("fake");
-  const player = { id: "player0" };
-  const match = createMatch(game, [player]);
+  const players = createFakePlayers(game);
+  const match = createMatch(game, players);
   const move = { fake: true };
 
   // Ensure the obvious.
@@ -184,14 +184,14 @@ test("match will end if there's a winner", (t) => {
   t.falsy(match.state.winner);
 
   // Fake games never find a winner, unless...
-  addMove(game, match, player, move);
+  addMove(game, match, players[0], move);
   t.falsy(match.state.finished);
   t.falsy(match.state.winner);
 
   // The right method is overridden.
   // Next move will trigger a winner.
-  game.getWinner = () => ({ player: player.index });
-  addMove(game, match, player, move);
+  game.getWinner = () => ({ player: players[0].index });
+  addMove(game, match, players[0], move);
   t.true(match.state.finished);
-  t.is(match.state.winner.player, player.index);
+  t.is(match.state.winner.player, players[0].index);
 });

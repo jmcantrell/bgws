@@ -23,19 +23,19 @@ export default class GameClientBase {
 
     this.spinnerInterval = null;
 
-    this.ws = new WebSocket(url);
+    this.client = new WebSocket(url);
 
-    this.ws.addEventListener("error", (error) => {
+    this.client.addEventListener("error", (error) => {
       console.error("websocket error", error);
     });
 
-    this.ws.addEventListener("open", () => {
+    this.client.addEventListener("open", () => {
       console.log("websocket connection opened");
       this.showLoading("Waiting for opponent.");
       this.join(this.game.id);
     });
 
-    this.ws.addEventListener("message", (event) => {
+    this.client.addEventListener("message", (event) => {
       const command = JSON.parse(event.data);
       console.log("received from server:", command);
       switch (command.action) {
@@ -45,11 +45,11 @@ export default class GameClientBase {
         case "end":
           return this.end(command.reason);
         default:
-          console.error("unknown command", command);
+          console.error("invalid command", command);
       }
     });
 
-    this.ws.addEventListener("close", () => {
+    this.client.addEventListener("close", () => {
       console.log("websocket connection closed");
       if (this.state) {
         this.state.turn = null;
@@ -98,7 +98,7 @@ export default class GameClientBase {
 
   end(reason) {
     this.showMessage(reason);
-    this.ws.close();
+    this.client.close();
   }
 
   draw() {
@@ -143,7 +143,7 @@ export default class GameClientBase {
 
   send(command) {
     console.log("sending to server:", command);
-    this.ws.send(JSON.stringify(command));
+    this.client.send(JSON.stringify(command));
   }
 
   showMessage(text) {

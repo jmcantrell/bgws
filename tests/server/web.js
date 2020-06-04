@@ -1,8 +1,8 @@
 import test from "ava";
 import {
-  fakeGames,
   createFakeWeb,
   createFakeLobby,
+  createFakeGames,
   connect,
   send,
   receive,
@@ -16,6 +16,7 @@ test.before(async (t) => {
 test.beforeEach(async (t) => {
   const { server } = t.context.web;
   t.context.client = await connect(server);
+  t.context.games = createFakeGames();
 });
 
 test.afterEach.always(async (t) => {
@@ -58,13 +59,13 @@ test("must specify a game to join", async (t) => {
 });
 
 test("able to join a game", async (t) => {
-  const { client } = t.context;
-  const game = fakeGames.get("fake1p");
+  const { client, games } = t.context;
+  const game = games.get("fake1p");
   send(client, { action: "join", game: game.id });
   const res = await receive(client);
   t.is(res.action, "update");
   t.is(res.player, 0);
-  t.deepEqual(res.state, game.createState());
+  t.deepEqual(res.state.board, game.createBoard());
 });
 
 test("disallow joining a game if already in a match", async (t) => {
@@ -77,8 +78,8 @@ test("disallow joining a game if already in a match", async (t) => {
 });
 
 test("move command must contain move data", async (t) => {
-  const { client } = t.context;
-  const game = fakeGames.get("fake1p");
+  const { client, games } = t.context;
+  const game = games.get("fake1p");
   send(client, { action: "join", game: game.id });
   await receive(client);
   send(client, { action: "move" });
@@ -87,8 +88,8 @@ test("move command must contain move data", async (t) => {
 });
 
 test("move command data must be an object", async (t) => {
-  const { client } = t.context;
-  const game = fakeGames.get("fake1p");
+  const { client, games } = t.context;
+  const game = games.get("fake1p");
   send(client, { action: "join", game: game.id });
   await receive(client);
   send(client, { action: "move", move: "fake" });
@@ -97,8 +98,8 @@ test("move command data must be an object", async (t) => {
 });
 
 test("able to make a move", async (t) => {
-  const { client } = t.context;
-  const game = fakeGames.get("fake1p");
+  const { client, games } = t.context;
+  const game = games.get("fake1p");
   send(client, { action: "join", game: game.id });
   await receive(client);
   send(client, { action: "move", move: {} });

@@ -1,6 +1,7 @@
-import GameClientBase from "/game.js";
+import * as grid from "/lib/grid.js";
 import * as rect from "/lib/rect.js";
 import * as game from "/lib/games/checkers.js";
+import GameClientBase from "/game.js";
 import { clear as clearCanvas } from "/lib/canvas.js";
 
 const colors = ["black", "darkred"];
@@ -44,7 +45,7 @@ export default class GameClient extends GameClientBase {
 
   resize() {
     const viewport = super.resize();
-    this.setProperties(viewport);
+    this.setScale(viewport);
   }
 
   move() {
@@ -95,7 +96,7 @@ export default class GameClient extends GameClientBase {
     // Filter the possible jumps to the ones matching the jump step.
     const moves = this.getMoves(this.selectedMove.from);
     let jumps = moves.jumps.filter(
-      (jump) => jump.length > n && game.sameSpace(jump[n].space, space)
+      (jump) => jump.length > n && grid.isSameSpace(jump[n].space, space)
     );
 
     // Get the jump step information.
@@ -105,8 +106,8 @@ export default class GameClient extends GameClientBase {
 
     // Move the piece and clear capture.
     const { board } = this.state;
-    game.setCell(board, step.capture.space, null);
-    game.moveCell(board, this.selected, space);
+    grid.setValue(board, step.capture.space, null);
+    game.movePiece(board, this.selected, space);
 
     // Determine if there are any further jump steps.
     jumps = jumps.filter((jump) => jump.length > n + 1);
@@ -142,12 +143,15 @@ export default class GameClient extends GameClientBase {
     const { board } = this.state;
 
     // Group all available moves by type.
-    for (const { space } of game.getPieces(board, this.player)) {
-      const moves = game.getMoves(board, space);
-      if (moves) {
-        const { hops, jumps } = moves;
-        if (hops) allHops.push({ space, hops });
-        if (jumps) allJumps.push({ space, jumps });
+    for (const space of game.getSpaces()) {
+      const piece = grid.getValue(board, space);
+      if (piece && piece.player == this.player) {
+        const moves = game.getMoves(board, space);
+        if (moves) {
+          const { hops, jumps } = moves;
+          if (hops) allHops.push({ space, hops });
+          if (jumps) allJumps.push({ space, jumps });
+        }
       }
     }
 
@@ -176,12 +180,12 @@ export default class GameClient extends GameClientBase {
 
   isSelectable(space) {
     if (!this.selectable) return false;
-    return this.selectable.some((s) => game.sameSpace(s, space));
+    return this.selectable.some((s) => grid.isSameSpace(s, space));
   }
 
   isTarget(space) {
     if (!this.targets) return null;
-    return this.targets.find((t) => game.sameSpace(t, space));
+    return this.targets.find((t) => grid.isSameSpace(t, space));
   }
 
   getMoves(space) {
@@ -189,8 +193,9 @@ export default class GameClient extends GameClientBase {
     return this.indexedMoves[row][column];
   }
 
-  setProperties(viewport) {
+  setScale(viewport) {
     const { width, height } = viewport;
+    const aspectRatio = { width: game.columns, height: game.rows };
 
     // Is the viewport portrait or landscape orientation?  Use the
     // smaller of the horizontal or vertical dimension as the basis for
@@ -199,8 +204,6 @@ export default class GameClient extends GameClientBase {
 
     const m = Math.trunc(min * 0.05);
     const margin = { top: m, bottom: m, left: m, right: m };
-
-    const aspectRatio = { width: game.columns, height: game.rows };
 
     // Get a box for the area of a canvas inside the margins.
     const inner = rect.trim(viewport, margin);
@@ -214,46 +217,46 @@ export default class GameClient extends GameClientBase {
 
     // Grid is another box with the right aspect ratio, but shrunk.
     const padding = Math.trunc(min * 0.01);
-    const grid = rect.fit(
+    const board = rect.fit(
       {
         width: frame.width - padding * 2,
         height: frame.height - padding * 2,
       },
       aspectRatio
     );
-    grid.top = rect.getCenterVertical(frame, grid);
-    grid.bottom = grid.top + grid.height;
-    grid.left = rect.getCenterHorizontal(frame, grid);
-    grid.right = grid.left + grid.width;
+    board.top = rect.getCenterVertical(frame, board);
+    board.bottom = board.top + board.height;
+    board.left = rect.getCenterHorizontal(frame, board);
+    board.right = board.left + board.width;
 
     const cells = game.createGrid();
-    const cellSize = Math.trunc(grid.width / aspectRatio.width);
+    const cellSize = Math.trunc(board.width / aspectRatio.width);
     const cellCenter = Math.trunc(cellSize / 2);
 
     for (const space of game.getSpaces()) {
       let cx, cy, left, top;
       if (this.player == 0) {
-        left = grid.left + space.column * cellSize;
-        top = grid.top + space.row * cellSize;
+        left = board.left + space.column * cellSize;
+        top = board.top + space.row * cellSize;
         cx = left + cellCenter;
         cy = top + cellCenter;
       } else {
-        const right = grid.right - space.column * cellSize;
-        const bottom = grid.bottom - space.row * cellSize;
+        const right = board.right - space.column * cellSize;
+        const bottom = board.bottom - space.row * cellSize;
         left = right - cellSize;
         top = bottom - cellSize;
         cx = right - cellCenter;
         cy = bottom - cellCenter;
       }
-      game.setCell(cells, space, { top, left, cx, cy });
+      grid.setValue(cells, space, { top, left, cx, cy });
     }
 
-    this.properties = { frame, grid, cells, cellSize };
+    this.scale = { frame, board, cells, cellSize };
   }
 
   getSpace(x, y) {
-    const { cellSize, grid } = this.properties;
-    const { top, bottom, left, right } = grid;
+    const { cellSize } = this.scale;
+    const { top, bottom, left, right } = this.scale.board;
     if (x > left && x < right && y > top && y < bottom) {
       let row, column;
       if (this.player == 0) {
@@ -269,13 +272,8 @@ export default class GameClient extends GameClientBase {
   }
 
   getSize(scale) {
-    const { cellSize } = this.properties;
+    const { cellSize } = this.scale;
     return Math.trunc(cellSize * scale);
-  }
-
-  getCell(space) {
-    const { cells } = this.properties;
-    return game.getCell(cells, space);
   }
 
   drawBoard() {
@@ -284,20 +282,18 @@ export default class GameClient extends GameClientBase {
     const canvas = this.elements.board;
     const context = canvas.getContext("2d");
 
-    const { frame, grid, cells, cellSize } = this.properties;
+    const { frame, board, cells, cellSize } = this.scale;
 
     context.fillStyle = "darkgrey";
     context.fillRect(frame.left, frame.top, frame.width, frame.height);
 
     context.fillStyle = "#f0dc82";
-    context.fillRect(grid.left, grid.top, grid.width, grid.height);
+    context.fillRect(board.left, board.top, board.width, board.height);
 
     context.fillStyle = "green";
     for (const space of game.getSpaces()) {
-      const cell = game.getCell(cells, space);
-      if (cell) {
-        context.fillRect(cell.left, cell.top, cellSize, cellSize);
-      }
+      const { left, top } = grid.getValue(cells, space);
+      context.fillRect(left, top, cellSize, cellSize);
     }
   }
 
@@ -307,10 +303,9 @@ export default class GameClient extends GameClientBase {
     const canvas = this.elements.pieces;
     const context = canvas.getContext("2d");
 
-    const { board } = this.state;
-
-    for (const { space, piece } of game.getAllPieces(board)) {
-      this.drawPiece(context, space, piece);
+    for (const space of game.getSpaces()) {
+      const piece = grid.getValue(this.state.board, space);
+      if (piece) this.drawPiece(context, space, piece);
     }
   }
 
@@ -345,43 +340,43 @@ export default class GameClient extends GameClientBase {
   }
 
   drawPiece(context, space, piece) {
-    const cell = this.getCell(space);
+    const { cx, cy } = grid.getValue(this.scale.cells, space);
     const radius = this.getSize(0.35);
     context.fillStyle = colors[piece.player];
     context.strokeStyle = "darkgrey";
     context.lineWidth = 2;
     context.beginPath();
-    context.ellipse(cell.cx, cell.cy, radius, radius, 0, 0, 2 * Math.PI);
+    context.ellipse(cx, cy, radius, radius, 0, 0, 2 * Math.PI);
     context.fill();
     context.stroke();
     if (piece.king) {
       const radius = this.getSize(0.15);
       context.fillStyle = "white";
       context.beginPath();
-      context.ellipse(cell.cx, cell.cy, radius, radius, 0, 0, 2 * Math.PI);
+      context.ellipse(cx, cy, radius, radius, 0, 0, 2 * Math.PI);
       context.fill();
     }
   }
 
   drawSelected(context, space) {
-    const cell = this.getCell(space);
+    const { cx, cy } = grid.getValue(this.scale.cells, space);
     const radius = this.getSize(0.4);
     context.strokeStyle = "white";
     context.lineWidth = 2;
     context.setLineDash([]);
     context.beginPath();
-    context.ellipse(cell.cx, cell.cy, radius, radius, 0, 0, 2 * Math.PI);
+    context.ellipse(cx, cy, radius, radius, 0, 0, 2 * Math.PI);
     context.stroke();
   }
 
   drawSelectable(context, space) {
-    const cell = this.getCell(space);
+    const { cx, cy } = grid.getValue(this.scale.cells, space);
     const radius = this.getSize(0.4);
     context.strokeStyle = "white";
     context.lineWidth = 2;
     context.setLineDash([5, 5]);
     context.beginPath();
-    context.ellipse(cell.cx, cell.cy, radius, radius, 0, 0, 2 * Math.PI);
+    context.ellipse(cx, cy, radius, radius, 0, 0, 2 * Math.PI);
     context.stroke();
   }
 }

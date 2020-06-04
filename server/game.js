@@ -11,7 +11,10 @@ export function createMatch(game, players) {
     start: Date.now(),
     players: [],
     moves: [],
-    state: game.createState(),
+    state: {
+      turn: 0,
+      board: game.createBoard(),
+    },
   };
 
   for (let i = 0; i < players.length; i++) {
@@ -38,16 +41,17 @@ export function addMove(game, match, player, move) {
     }
   }
   const { state } = match;
+  const { board } = state;
 
-  game.setMove(state, player.index, move);
+  game.setMove(board, player.index, move);
 
   move.player = player.index;
   match.moves.push(move);
 
-  const winner = game.getWinner(state, player.index, move);
+  const winner = game.getWinner(board, player.index, move);
   if (winner) state.winner = winner;
 
-  const finished = Boolean(winner) || game.isDraw(state, player.index, move);
+  const finished = Boolean(winner) || game.isDraw(board, player.index, move);
   if (finished) state.finished = finished;
 
   const turn = (player.index + 1) % game.numPlayers;

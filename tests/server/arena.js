@@ -1,13 +1,12 @@
 import test from "ava";
-import Arena from "../../server/arena.js";
-import { connectTestRedis, fakeGames } from "../_setup.js";
-import { createPlayer, createMatch } from "../../server/game.js";
 
-function* getPlayers(game) {
-  for (let i = 0; i < game.numPlayers; i++) {
-    yield createPlayer(`player-${game.id}-${i}`, game.id, "fake");
-  }
-}
+import Arena from "../../server/arena.js";
+import { createPlayer, createMatch } from "../../server/game.js";
+import {
+  connectTestRedis,
+  createFakeGames,
+  createFakePlayers,
+} from "../_setup.js";
 
 test.before(async (t) => {
   const redis = await connectTestRedis();
@@ -16,7 +15,7 @@ test.before(async (t) => {
 
 test.beforeEach(async (t) => {
   const { redis } = t.context;
-  const games = fakeGames;
+  const games = createFakeGames();
   const arena = new Arena({ redis, games });
   t.context.arena = arena;
 });
@@ -44,19 +43,17 @@ test.serial("new players can be added to queue", async (t) => {
 test.serial("unable to join an invalid game", async (t) => {
   const { arena, redis } = t.context;
   const playerID = "player0";
+
   await t.throwsAsync(
     async () => {
       await arena.join(playerID, "bogus", "fake");
     },
     { message: "game does not exist" }
   );
+
+  // Ensure player was not added.
+  t.is(await redis.llen("joined"), 0);
   t.falsy(await arena.getPlayer(playerID));
-  await new Promise((resolve) => {
-    redis.llen("joined", (err, res) => {
-      t.is(res, 0);
-      resolve();
-    });
-  });
 });
 
 test.serial("invalid player unable to make move", async (t) => {
@@ -83,12 +80,12 @@ test.serial("player unable to make move if not in a match", async (t) => {
 
 test.serial("player able to make move on a match", async (t) => {
   const { arena } = t.context;
-  for (const game of fakeGames.values()) {
+  for (const game of arena.games.values()) {
+    const players = createFakePlayers(game);
     const playerIDs = [];
-    for (let i = 0; i < game.numPlayers; i++) {
-      const playerID = `player-${game.id}-${i}`;
-      playerIDs.push(playerID);
-      await arena.join(playerID, game.id, "fake");
+    for (const player of players) {
+      playerIDs.push(player.id);
+      await arena.join(player.id, game.id, "fake");
       await arena.sortNextPlayer();
     }
     for (const playerID of playerIDs) {
@@ -104,14 +101,15 @@ test.serial("player able to make move on a match", async (t) => {
 
 test.serial("parting a match clears relevant data", async (t) => {
   const { arena } = t.context;
-  for (const game of fakeGames.values()) {
+  for (const game of arena.games.values()) {
+    const players = createFakePlayers(game);
     const playerIDs = [];
-    for (let i = 0; i < game.numPlayers; i++) {
-      const playerID = `player-${game.id}-${i}`;
-      playerIDs.push(playerID);
-      await arena.join(playerID, game.id, "fake");
+    for (const player of players) {
+      playerIDs.push(player.id);
+      await arena.join(player.id, game.id, "fake");
       await arena.sortNextPlayer();
     }
+
     // Once any player parts, the match is deleted.
     // Should not matter which player parts.
     const index = Math.trunc(Math.random() * game.numPlayers);
@@ -119,6 +117,8 @@ test.serial("parting a match clears relevant data", async (t) => {
     const player = await arena.getPlayer(playerID);
     t.is(player.id, playerID);
     t.truthy(player.match);
+
+    // Ensure match and players are cleared.
     const match = await arena.getMatch(player.match);
     t.is(player.match, match.id);
     for (const playerID of playerIDs) {
@@ -149,7 +149,7 @@ test.serial("parting a match sends end command to all players", async (t) => {
     });
   });
   const parting = [];
-  for (const game of fakeGames.values()) {
+  for (const game of arena.games.values()) {
     const playerIDs = [];
     for (let i = 0; i < game.numPlayers; i++) {
       const playerID = `player-${game.id}-${i}`;
@@ -223,8 +223,8 @@ test.serial("players can be sorted into game-specific queues", async (t) => {
 
 test.serial("able to recover from players parting before start", async (t) => {
   const { arena } = t.context;
-  const game = fakeGames.get("fake2p");
-  const players = Array.from(getPlayers(game));
+  const game = arena.games.get("fake2p");
+  const players = createFakePlayers(game);
   for (let i = 0; i < players.length; i++) {
     const player = players[i];
     await arena.join(player.id, game.id, "fake");
@@ -241,12 +241,12 @@ test.serial("able to recover from players parting before start", async (t) => {
 
 test.serial("players will be matched when enough have joined", async (t) => {
   const { arena } = t.context;
-  for (const game of fakeGames.values()) {
+  for (const game of arena.games.values()) {
     // There will be more players than necessary. They should remain in
     // the game's queue after the first group of players are matched,
     // waiting for the next group.
     game.numPlayers++;
-    const players = Array.from(getPlayers(game));
+    const players = createFakePlayers(game);
     game.numPlayers--;
 
     let count = 0;
@@ -267,8 +267,8 @@ test.serial("players will be matched when enough have joined", async (t) => {
 
 test.serial("able to create, save, get, and delete matches", async (t) => {
   const { arena } = t.context;
-  const game = fakeGames.get("fake1p");
-  const players = Array.from(getPlayers(game));
+  const game = arena.games.get("fake1p");
+  const players = createFakePlayers(game);
   const match = createMatch(game, players);
   await arena.saveMatch(match);
   t.deepEqual(match, await arena.getMatch(match.id));
@@ -278,9 +278,11 @@ test.serial("able to create, save, get, and delete matches", async (t) => {
 
 test.serial("able to update players with match state", async (t) => {
   const { arena } = t.context;
-  const game = fakeGames.get("fake1p");
-  const players = Array.from(getPlayers(game));
+
+  const game = arena.games.get("fake1p");
+  const players = createFakePlayers(game);
   const match = createMatch(game, players);
+
   const promise = new Promise((resolve) => {
     const seen = new Set();
     arena.on("command", (channel, playerID, command) => {
@@ -296,63 +298,69 @@ test.serial("able to update players with match state", async (t) => {
       }
     });
   });
+
   await arena.update(match, players);
   await promise;
 });
 
 test.serial("match starts when enough players have joined", async (t) => {
   const { arena } = t.context;
-  const channel = "fake";
-  const fakePlayerIDs = new Map();
-  for (const game of fakeGames.values()) {
-    const playerIDs = [];
-    for (let i = 0; i < game.numPlayers; i++) {
-      playerIDs.push(`player-${game.id}-${i}`);
-    }
-    fakePlayerIDs.set(game.id, playerIDs);
+
+  const allFakePlayers = new Map();
+  for (const game of arena.games.values()) {
+    allFakePlayers.set(game.id, createFakePlayers(game));
   }
+
+  // Ensure every game has a match and the correct players.
   const promise = new Promise((resolve) => {
     let count = 0;
     arena.on("match", async (gameID, matchID, playerIDs) => {
-      t.deepEqual(fakePlayerIDs.get(gameID), playerIDs);
-      if (++count == fakePlayerIDs.size) {
+      const fakePlayers = allFakePlayers.get(gameID);
+      const fakePlayerIDs = fakePlayers.map((player) => player.id);
+      t.deepEqual(fakePlayerIDs, playerIDs);
+      if (++count == allFakePlayers.size) {
         return resolve();
       }
     });
   });
-  for (const [gameID, playerIDs] of fakePlayerIDs.entries()) {
-    for (const playerID of playerIDs) {
-      await arena.join(playerID, gameID, channel);
+
+  for (const [gameID, fakePlayers] of allFakePlayers.entries()) {
+    for (const player of fakePlayers) {
+      await arena.join(player.id, gameID, "fake");
       await arena.sortNextPlayer();
     }
   }
+
   await promise;
 });
 
 test.serial("able to listen for new players", async (t) => {
   const { arena } = t.context;
-  const games = fakeGames;
+
   // Lobby needs a dedicated redis connection.
   const redis = await connectTestRedis();
-  const lobby = new Arena({ redis, games });
+  const lobby = new Arena({ redis, games: arena.games });
+
+  // Ensure a match was created for every game.
   const promise = new Promise((resolve) => {
     let seen = new Set();
     lobby.on("match", (gameID) => {
       seen.add(gameID);
-      if (seen.size == games.size) {
+      if (seen.size == lobby.games.size) {
         t.pass();
         return resolve();
       }
     });
   });
+
   await lobby.listen();
-  for (const game of fakeGames.values()) {
-    const playerIDs = [];
-    for (let i = 0; i < game.numPlayers; i++) {
-      const playerID = `player-${game.id}-${i}`;
-      playerIDs.push(playerID);
-      await arena.join(playerID, game.id, "fake");
+
+  for (const game of lobby.games.values()) {
+    const players = createFakePlayers(game);
+    for (const player of players) {
+      await arena.join(player.id, game.id, "fake");
     }
   }
+
   await promise;
 });

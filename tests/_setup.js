@@ -2,23 +2,25 @@ import got from "got";
 import jsdom from "jsdom";
 import WebSocket from "ws";
 import { once } from "events";
+
 import Web from "../server/web.js";
 import Lobby from "../server/lobby.js";
 import loadGames from "../server/games.js";
-import connectRedis from "../server/redis.js";
 import createLogger from "../server/logger.js";
+import connectRedis from "../server/redis.js";
+import { createPlayer } from "../server/game.js";
 
 process.env.PORT = 0;
 process.env.LOG_LEVEL = "silent";
 
-export function createFakeGame(id, numPlayers = 1) {
+export function createFakeGame(gameID, numPlayers = 1) {
   return {
-    id,
+    id: gameID,
     name: `Fake ${numPlayers}-Player Game`,
     description: `A fake game for ${numPlayers} players.`,
     numPlayers,
-    createState: () => {
-      return { turn: 0 };
+    createBoard: () => {
+      return null;
     },
     setMove: () => {},
     isDraw: () => {
@@ -30,12 +32,22 @@ export function createFakeGame(id, numPlayers = 1) {
   };
 }
 
-export const fakeGames = new Map();
+export function createFakeGames(maxNumPlayers = 4) {
+  const fakeGames = new Map();
+  for (let numPlayers = 1; numPlayers <= maxNumPlayers; numPlayers++) {
+    const fakeGame = createFakeGame(`fake${numPlayers}p`, numPlayers);
+    fakeGames.set(fakeGame.id, fakeGame);
+  }
+  return fakeGames;
+}
 
-// Create a set of fake games ranging from 1 to 4 players.
-for (let i = 1; i <= 4; i++) {
-  const id = `fake${i}p`;
-  fakeGames.set(id, createFakeGame(id, i));
+export function createFakePlayers(game) {
+  const fakePlayers = [];
+  for (let index = 0; index < game.numPlayers; index++) {
+    const fakePlayer = createPlayer(`player-${game.id}-${index}`, game.id, "fake");
+    fakePlayers.push(fakePlayer);
+  }
+  return fakePlayers;
 }
 
 export function connectTestRedis() {
@@ -67,11 +79,11 @@ export async function createRealLobby() {
 }
 
 export async function createFakeWeb() {
-  return await createWeb({ games: fakeGames });
+  return await createWeb({ games: createFakeGames() });
 }
 
 export async function createFakeLobby() {
-  return await createLobby({ games: fakeGames });
+  return await createLobby({ games: createFakeGames() });
 }
 
 export function connect(server) {

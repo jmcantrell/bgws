@@ -1,8 +1,14 @@
 import test from "ava";
 import http from "http";
+
 import createApp from "../server/app.js";
 import createLogger from "../server/logger.js";
-import { fakeGames, createRealWeb, getResponse, getDocument } from "./_setup.js";
+import {
+  getResponse,
+  getDocument,
+  createRealWeb,
+  createFakeGames,
+} from "./_setup.js";
 
 async function assertResponse(t, server, path, status = 200) {
   const res = await getResponse(server, path);
@@ -10,8 +16,7 @@ async function assertResponse(t, server, path, status = 200) {
   return res;
 }
 
-function testHeader(t, document, text) {
-}
+function testHeader(t, document, text) {}
 
 function testLayout(t, document) {
   t.truthy(document.querySelector("a[href='/']"));
@@ -21,18 +26,23 @@ function testLayout(t, document) {
 function testMessageDialog(t, document) {
   const parent = document.getElementById("message");
   t.truthy(parent);
+
   // The thing is a dialog box.
   t.true(parent.classList.contains("dialog"));
+
   // The dialog is hidden by default.
   t.true(parent.classList.contains("hide"));
+
   // There is a text area.
   const text = document.getElementById("message-text");
   t.truthy(text);
   t.true(parent.contains(text));
+
   // There is an actions area.
   const actions = document.getElementById("message-actions");
   t.truthy(actions);
   t.true(parent.contains(actions));
+
   // There is an okay button.
   const okay = document.getElementById("message-okay");
   t.truthy(okay);
@@ -42,14 +52,18 @@ function testMessageDialog(t, document) {
 function testLoadingDialog(t, document) {
   const parent = document.getElementById("loading");
   t.truthy(parent);
+
   // The thing is a dialog box.
   t.true(parent.classList.contains("dialog"));
+
   // The dialog is hidden by default.
   t.true(parent.classList.contains("hide"));
+
   // There is a text area.
   const text = document.getElementById("loading-text");
   t.truthy(text);
   t.true(parent.contains(text));
+
   // There is a busy spinner.
   const spinner = document.getElementById("loading-spinner");
   t.truthy(spinner);
@@ -69,10 +83,15 @@ test("404", async (t) => {
 });
 
 test("500", async (t) => {
-  const app = createApp({ games: fakeGames, logger: createLogger() });
+  const logger = createLogger();
+  const games = createFakeGames();
+  const app = createApp({ games, logger });
+
   // Create a condition that will result in an uncaught exception.
   app.locals.games = null;
+
   const server = http.createServer(app);
+
   await new Promise((resolve) => {
     server.listen(0, async () => {
       const res = await assertResponse(t, server, "games/", 500);
@@ -109,8 +128,8 @@ test("/games/", async (t) => {
 
 test("/games/:id/", async (t) => {
   const { server, games } = t.context.web;
-  for (const [gameID, game] of games.entries()) {
-    const url = `games/${gameID}/`;
+  for (const game of games.values()) {
+    const url = `games/${game.id}/`;
     const res = await assertResponse(t, server, url);
     const document = getDocument(res);
     testLayout(t, document);

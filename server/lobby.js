@@ -21,6 +21,10 @@ export default class Lobby extends EventEmitter {
       this.logger.trace({ channel, client, command }, "sending command");
       await this.conduit.send(channel, client, command);
     });
+
+    this.arena.on("error", (err) => {
+      this.logger.error(err);
+    });
   }
 
   async listen() {

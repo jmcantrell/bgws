@@ -156,12 +156,11 @@ export default class GameClient extends GameClientBase {
 
     const radius = this.getSize(0.4);
     context.fillStyle = "white";
-    for (const { value } of grid.getAllValues(this.scale.cells)) {
-      if (value) {
-        context.beginPath();
-        context.ellipse(value.cx, value.cy, radius, radius, 0, 0, 2 * Math.PI);
-        context.fill();
-      }
+    for (const space of game.getSpaces()) {
+      const { cx, cy } = grid.getValue(this.scale.cells, space);
+      context.beginPath();
+      context.ellipse(cx, cy, radius, radius, 0, 0, 2 * Math.PI);
+      context.fill();
     }
   }
 

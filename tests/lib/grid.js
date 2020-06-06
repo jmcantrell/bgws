@@ -84,13 +84,62 @@ test("able to get every space in a grid", (t) => {
   const rows = getRandomInteger();
   const columns = getRandomInteger();
   const g = grid.create(rows, columns);
+
   const value = "foo";
+
   for (const space of grid.getSpaces(rows, columns)) {
+    // Should not be outside the bounds of the grid.
+    const { row, column } = space;
+    t.false(row < 0 || row > rows - 1);
+    t.false(column < 0 || column > columns - 1);
+    // Set a value to check later.
     grid.setValue(g, space, value);
   }
+
+  // Ensure every value was set.
   for (let row = 0; row < rows; row++) {
     for (let column = 0; column < columns; column++) {
       t.is(g[row][column], value);
     }
   }
+});
+
+test("able to add two spaces", (t) => {
+  const row = getRandomInteger();
+  const column = getRandomInteger();
+  const space = grid.addSpace({ row, column }, { row, column });
+  t.is(space.row, row * 2);
+  t.is(space.column, column * 2);
+});
+
+test("able to move value from one space to another", (t) => {
+  const rows = 10;
+  const columns = 10;
+  const g = grid.create(rows, columns);
+
+  // Use an object to ensure it's the same instance.
+  const value = { foo: true };
+
+  // Get a random source space.
+  const from = {
+    row: getRandomInteger(rows),
+    column: getRandomInteger(columns),
+  };
+
+  grid.setValue(g, from, value);
+
+  // Ensure the destination is not the same space.
+  let to;
+  do {
+    to = {
+      row: getRandomInteger(rows),
+      column: getRandomInteger(columns),
+    };
+  } while (grid.isSameSpace(from, to));
+
+  const moved = grid.moveValue(g, from, to);
+
+  t.is(value, moved);
+  t.is(grid.getValue(g, to), value);
+  t.is(grid.getValue(g, from), null);
 });

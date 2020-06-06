@@ -33,7 +33,8 @@ export default class GameClient extends GameClientBase {
 
   update(state) {
     super.update(state);
-    this.setIndexedMoves();
+    this.setSelectable();
+    this.draw();
   }
 
   draw() {
@@ -54,10 +55,11 @@ export default class GameClient extends GameClientBase {
     delete this.selected;
     delete this.selectable;
     delete this.selectedMove;
+    this.draw();
   }
 
   onSpaceClick(space) {
-    if (this.getMoves(space) && !this.isJumpStarted()) {
+    if (this.isSelectable(space) && !this.isJumpStarted()) {
       this.selectPiece(space);
     } else {
       this.selectTarget(space);
@@ -67,22 +69,25 @@ export default class GameClient extends GameClientBase {
 
   selectPiece(space) {
     this.selected = space;
+    const piece = grid.getValue(this.state.board, space);
     this.selectedMove = { from: space };
-    const { jumps, hops } = this.getMoves(space);
+    const jumps = game.getJumps(this.state.board, space, piece);
 
-    if (jumps) {
+    if (jumps.length > 0) {
       this.selectedMove.jump = [];
-      this.targets = jumps.map((jump) => jump[0].space);
+      this.targets = jumps.map((jump) => jump.space);
     } else {
-      this.targets = hops;
+      this.targets = game.getHops(this.state.board, space, piece);
     }
   }
 
   selectTarget(space) {
     if (this.isTarget(space)) {
       if (this.selectedMove.jump) {
-        const jumps = this.addJumpStep(space);
-        if (jumps.length == 0) this.move();
+        this.addJumpStep(space);
+        if (this.targets.length == 0) {
+          this.move();
+        }
       } else {
         this.selectedMove.hop = space;
         this.move();
@@ -91,41 +96,30 @@ export default class GameClient extends GameClientBase {
   }
 
   addJumpStep(space) {
-    const n = this.selectedMove.jump.length;
+    const piece = grid.getValue(this.state.board, this.selected);
 
-    // Filter the possible jumps to the ones matching the jump step.
-    const moves = this.getMoves(this.selectedMove.from);
-    let jumps = moves.jumps.filter(
-      (jump) => jump.length > n && grid.isSameSpace(jump[n].space, space)
-    );
-
-    // Get the jump step information.
-    // Every possible jump that remains has the same prefix.
-    const step = jumps[0][n];
-    this.selectedMove.jump.push(step.space);
+    // Get the selected jump.
+    const jump = game
+      .getJumps(this.state.board, this.selected, piece)
+      .find((jump) => grid.isSameSpace(jump.space, space));
 
     // Move the piece and clear capture.
-    const { board } = this.state;
-    grid.setValue(board, step.capture.space, null);
-    game.movePiece(board, this.selected, space);
+    grid.setValue(this.state.board, jump.capture.space, null);
+    grid.moveValue(this.state.board, this.selected, space);
 
-    // Determine if there are any further jump steps.
-    jumps = jumps.filter((jump) => jump.length > n + 1);
+    // Add the selected jump;
+    this.selectedMove.jump.push(space);
 
-    // Set selection targets.
-    if (jumps.length > 0) {
-      this.targets = jumps.map((jump) => jump[n + 1].space);
-    } else {
-      delete this.targets;
-    }
-
-    // Select the new location.
+    // Reset the selection to the new space.
     this.selected = space;
 
     // Ensure that jump cannot be taken back, once started.
     delete this.selectable;
 
-    return jumps;
+    // Reset the jump targets to newly available jumps.
+    this.targets = game
+      .getJumps(this.state.board, this.selected, piece)
+      .map((jump) => jump.space);
   }
 
   isJumpStarted() {
@@ -136,46 +130,22 @@ export default class GameClient extends GameClientBase {
     );
   }
 
-  setIndexedMoves() {
-    const allHops = [];
-    const allJumps = [];
-
-    const { board } = this.state;
+  setSelectable() {
+    const hoppable = [];
+    const jumpable = [];
 
     // Group all available moves by type.
     for (const space of game.getSpaces()) {
-      const piece = grid.getValue(board, space);
+      const piece = grid.getValue(this.state.board, space);
       if (piece && piece.player == this.player) {
-        const moves = game.getMoves(board, space);
-        if (moves) {
-          const { hops, jumps } = moves;
-          if (hops) allHops.push({ space, hops });
-          if (jumps) allJumps.push({ space, jumps });
-        }
+        const hops = game.getHops(this.state.board, space, piece);
+        if (hops.length > 0) hoppable.push(space);
+        const jumps = game.getJumps(this.state.board, space, piece);
+        if (jumps.length > 0) jumpable.push(space);
       }
     }
 
-    this.selectable = [];
-    this.indexedMoves = game.createGrid();
-
-    // If there are any jumps available, they must be preferred.
-    if (allJumps.length > 0) {
-      for (const moves of allJumps) {
-        const { space, jumps } = moves;
-        this.selectable.push(space);
-        const { row, column } = space;
-        this.indexedMoves[row][column] = { jumps };
-      }
-    } else if (allHops.length > 0) {
-      for (const moves of allHops) {
-        const { space, hops } = moves;
-        this.selectable.push(space);
-        const { row, column } = space;
-        this.indexedMoves[row][column] = { hops };
-      }
-    }
-
-    this.draw();
+    this.selectable = jumpable.length > 0 ? jumpable : hoppable;
   }
 
   isSelectable(space) {
@@ -189,8 +159,7 @@ export default class GameClient extends GameClientBase {
   }
 
   getMoves(space) {
-    const { row, column } = space;
-    return this.indexedMoves[row][column];
+    return grid.getValue(this.indexedMoves, space);
   }
 
   setScale(viewport) {
@@ -229,24 +198,24 @@ export default class GameClient extends GameClientBase {
     board.left = rect.getCenterHorizontal(frame, board);
     board.right = board.left + board.width;
 
-    const cells = game.createGrid();
+    const cells = game.createEmptyBoard();
     const cellSize = Math.trunc(board.width / aspectRatio.width);
     const cellCenter = Math.trunc(cellSize / 2);
 
     for (const space of game.getSpaces()) {
       let cx, cy, left, top;
       if (this.player == 0) {
-        left = board.left + space.column * cellSize;
-        top = board.top + space.row * cellSize;
-        cx = left + cellCenter;
-        cy = top + cellCenter;
-      } else {
         const right = board.right - space.column * cellSize;
         const bottom = board.bottom - space.row * cellSize;
         left = right - cellSize;
         top = bottom - cellSize;
         cx = right - cellCenter;
         cy = bottom - cellCenter;
+      } else {
+        left = board.left + space.column * cellSize;
+        top = board.top + space.row * cellSize;
+        cx = left + cellCenter;
+        cy = top + cellCenter;
       }
       grid.setValue(cells, space, { top, left, cx, cy });
     }
@@ -260,11 +229,11 @@ export default class GameClient extends GameClientBase {
     if (x > left && x < right && y > top && y < bottom) {
       let row, column;
       if (this.player == 0) {
-        row = Math.trunc((y - top) / cellSize);
-        column = Math.trunc((x - left) / cellSize);
-      } else {
         row = Math.trunc((bottom - y) / cellSize);
         column = Math.trunc((right - x) / cellSize);
+      } else {
+        row = Math.trunc((y - top) / cellSize);
+        column = Math.trunc((x - left) / cellSize);
       }
       return { row, column };
     }

@@ -19,8 +19,12 @@ export default class Arena extends EventEmitter {
 
   async listen() {
     setImmediate(async () => {
-      await this.sortNextPlayer();
-      await this.listen();
+      try {
+        await this.sortNextPlayer();
+        await this.listen();
+      } catch (err) {
+        this.emit("error", err);
+      }
     });
   }
 

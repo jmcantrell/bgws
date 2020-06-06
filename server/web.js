@@ -54,6 +54,10 @@ export default class Web extends EventEmitter {
       await this.conduit.send(channel, client, command);
     });
 
+    this.arena.on("error", (err) => {
+      this.logger.error(err);
+    });
+
     this.conduit.on("command", (client, command) => {
       this.logger.trace({ client, command }, "sending command to client");
       this.sockets.send(client, command);

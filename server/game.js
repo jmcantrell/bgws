@@ -56,4 +56,6 @@ export function addMove(game, match, player, move) {
 
   const turn = (player.index + 1) % game.numPlayers;
   state.turn = state.finished ? null : turn;
+
+  state.lastMove = match.moves[match.moves.length - 1];
 }

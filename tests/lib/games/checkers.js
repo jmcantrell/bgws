@@ -41,10 +41,6 @@ function encodeBoard(board) {
   return lines.join("\n");
 }
 
-function getRandomInteger(max = game.rows) {
-  return Math.trunc(Math.random() * max);
-}
-
 test(`board is a ${game.rows}x${game.columns} grid`, (t) => {
   t.deepEqual(game.createEmptyBoard(), grid.create(game.rows, game.columns));
 });
@@ -57,12 +53,9 @@ test("able to determine a players' movement direction", (t) => {
 test("able to determine the directions a piece can move", (t) => {
   for (const player of [0, 1]) {
     for (const king of [false, true]) {
-      const piece = { player };
-      if (king) piece.king = true;
-
       // Depending on the player, forward can mean different values.
       const orientation = game.getOrientation(player);
-      const directions = Array.from(game.getDirections(piece));
+      const directions = Array.from(game.getDirections({ player, king }));
 
       // If the piece is a king, there should be two additional
       // directions in the backwards directions.
@@ -73,7 +66,7 @@ test("able to determine the directions a piece can move", (t) => {
       }
 
       // In order to ensure that every direction is returned, use some
-      // counters, that will balance to predictable values.
+      // counters that will balance to predictable values.
       let rowChange = 0;
       let columnChange = 0;
 
@@ -120,7 +113,6 @@ test("able to get all playable spaces", (t) => {
   // Should be half of the available grid spaces.
   t.is(spaces.length, (game.rows * game.columns) / 2);
 
-  // A space is one that is an even row or even column, but not both.
   for (const space of spaces) {
     t.true(game.isPlayableSpace(space));
   }
@@ -159,41 +151,41 @@ test("player pieces are arranged at either end of the board", (t) => {
 test("able to get a playable adjacent space", (t) => {
   for (const space of game.getSpaces()) {
     const { row, column } = space;
-    const northeast = game.getAdjacentSpace(space, { row: -1, column: 1 });
-    const northwest = game.getAdjacentSpace(space, { row: -1, column: -1 });
-    const southeast = game.getAdjacentSpace(space, { row: 1, column: 1 });
-    const southwest = game.getAdjacentSpace(space, { row: 1, column: -1 });
+    const ne = game.getAdjacentSpace(space, grid.direction.northeast);
+    const nw = game.getAdjacentSpace(space, grid.direction.northwest);
+    const se = game.getAdjacentSpace(space, grid.direction.southeast);
+    const sw = game.getAdjacentSpace(space, grid.direction.southwest);
 
     // Check northwest direction.
     if (row == 0 || column == 0) {
-      t.is(northwest, null);
+      t.is(nw, null);
     } else {
-      t.is(northwest.row, row - 1);
-      t.is(northwest.column, column - 1);
+      t.is(nw.row, row - 1);
+      t.is(nw.column, column - 1);
     }
 
     // Check northeast direction.
     if (row == 0 || column == game.columns - 1) {
-      t.is(northeast, null);
+      t.is(ne, null);
     } else {
-      t.is(northeast.row, row - 1);
-      t.is(northeast.column, column + 1);
+      t.is(ne.row, row - 1);
+      t.is(ne.column, column + 1);
     }
 
     // Check southwest direction.
     if (row == game.rows - 1 || column == 0) {
-      t.is(southwest, null);
+      t.is(sw, null);
     } else {
-      t.is(southwest.row, row + 1);
-      t.is(southwest.column, column - 1);
+      t.is(sw.row, row + 1);
+      t.is(sw.column, column - 1);
     }
 
     // Check southeast direction.
     if (row == game.rows - 1 || column == game.columns - 1) {
-      t.is(southeast, null);
+      t.is(se, null);
     } else {
-      t.is(southeast.row, row + 1);
-      t.is(southeast.column, column + 1);
+      t.is(se.row, row + 1);
+      t.is(se.column, column + 1);
     }
   }
 });
@@ -208,25 +200,24 @@ test("able to find hops for a piece", (t) => {
 
         grid.setValue(board, space, piece);
 
-        // All hops are available if the adjacent spaces are empty.
-        const hops = game.getHops(board, space, piece);
+        const adjacentSpaces = [];
         for (const direction of game.getDirections(piece)) {
           const adjacentSpace = game.getAdjacentSpace(space, direction);
           if (adjacentSpace) {
-            t.true(hops.some((hop) => grid.isSameSpace(hop, adjacentSpace)));
+            adjacentSpaces.push(adjacentSpace);
           }
         }
 
+        // All hops are available if the adjacent spaces are empty.
+        t.deepEqual(adjacentSpaces, game.getHops(board, space, piece));
+
         // Fill the adjacent spaces with pieces to block hops.
-        for (const direction of game.getDirections(piece)) {
-          const adjacentSpace = game.getAdjacentSpace(space, direction);
-          if (adjacentSpace) {
-            grid.setValue(board, adjacentSpace, { player: opponent });
-          }
+        for (const adjacentSpace of adjacentSpaces) {
+          grid.setValue(board, adjacentSpace, { player: opponent });
         }
 
         // No hops are available if the adjacent spaces are occupied.
-        t.is(game.getHops(board, space, piece).length, 0);
+        t.deepEqual([], game.getHops(board, space, piece));
       }
     }
   }
@@ -243,7 +234,7 @@ test("able to find jumps for a piece", (t) => {
         grid.setValue(board, space, piece);
 
         // No jumps are available if the adjacent spaces are empty.
-        t.is(game.getJumps(board, space, piece).length, 0);
+        t.deepEqual([], game.getJumps(board, space, piece));
 
         // Fill adjacent spaces with same pieces to block jumps.
         for (const direction of game.getDirections(piece)) {
@@ -252,33 +243,65 @@ test("able to find jumps for a piece", (t) => {
             grid.setValue(board, adjacentSpace, { player });
           }
         }
-        t.is(game.getJumps(board, space, piece).length, 0);
+
+        // No jumps are available if the adjacent spaces are occupied by
+        // the same player's pieces.
+        t.deepEqual([], game.getJumps(board, space, piece));
 
         // Fill adjacent spaces with opponent pieces to allow jumps.
         const expectedJumps = [];
         for (const direction of game.getDirections(piece)) {
-          const capture = { space: game.getAdjacentSpace(space, direction) };
-          if (capture.space) {
-            capture.piece = { player: opponent };
-            grid.setValue(board, capture.space, capture.piece);
-            const target = game.getAdjacentSpace(capture.space, direction);
-            if (target) {
-              expectedJumps.push({ space: target, capture });
+          const captureSpace = game.getAdjacentSpace(space, direction);
+          if (captureSpace) {
+            grid.setValue(board, captureSpace, { player: opponent });
+            const targetSpace = game.getAdjacentSpace(captureSpace, direction);
+            if (targetSpace) {
+              expectedJumps.push(targetSpace);
             }
           }
         }
 
+        // Jumps are available if the adjacent spaces are occupied by an
+        // opponent piece, and the space directly beyond it is empty.
         t.deepEqual(expectedJumps, game.getJumps(board, space, piece));
       }
     }
   }
 });
 
-test("move space must be a valid space", (t) => {
+test("move must be either a hop or a jump", (t) => {
   const board = game.createEmptyBoard();
+  const from = { row: 0, column: 1 };
+
   t.throws(
     () => {
-      game.setMove(board, 0, { from: { row: 0, column: 0 } });
+      game.setMove(board, 0, { from });
+    },
+    { message: "invalid move" }
+  );
+});
+
+test("move must travel some distance", (t) => {
+  const board = game.createEmptyBoard();
+  const from = { row: 0, column: 1 };
+  const to = { row: 0, column: 1 };
+
+  t.throws(
+    () => {
+      game.checkMove(board, 0, from, to);
+    },
+    { message: "piece must move" }
+  );
+});
+
+test("move space must be a valid space", (t) => {
+  const board = game.createEmptyBoard();
+  const from = { row: 0, column: 0 };
+  const to = { row: 1, column: 0 };
+
+  t.throws(
+    () => {
+      game.checkMove(board, 0, from, to);
     },
     { message: "invalid space" }
   );
@@ -286,96 +309,166 @@ test("move space must be a valid space", (t) => {
 
 test("move space must contain a piece", (t) => {
   const board = game.createEmptyBoard();
+  const from = { row: 0, column: 1 };
+  const to = { row: 1, column: 0 };
+
   t.throws(
     () => {
-      game.setMove(board, 0, { from: { row: 0, column: 1 } });
+      game.checkMove(board, 0, from, to);
     },
-    { message: "no piece at that space" }
+    { message: "piece not found" }
   );
 });
 
 test("move piece must belong to player", (t) => {
   const board = game.createEmptyBoard();
-  const space = { row: 0, column: 1 };
-  grid.setValue(board, space, { player: 1 });
+  const from = { row: 0, column: 1 };
+  const to = { row: 1, column: 0 };
+
+  grid.setValue(board, from, { player: 1 });
+
   t.throws(
     () => {
-      game.setMove(board, 0, { from: space });
+      game.checkMove(board, 0, from, to);
     },
     { message: "piece does not belong to player" }
   );
 });
 
-test("move must be either a hop or a jump", (t) => {
+test("move must be within the board", (t) => {
   const board = game.createEmptyBoard();
-  const space = { row: 0, column: 1 };
-  grid.setValue(board, space, { player: 0 });
-  t.throws(
-    () => {
-      game.setMove(board, 0, { from: space });
-    },
-    { message: "invalid move" }
-  );
-});
-
-test("move hop must be a single space", (t) => {
-  const board = game.createEmptyBoard();
-  const space = { row: 0, column: 1 };
+  const from = { row: 1, column: 0 };
+  const to = { row: 2, column: -1 };
   const player = 0;
-  const move = { from: space, hop: { row: 2, column: 3 } };
-  grid.setValue(board, space, { player });
+
+  grid.setValue(board, from, { player });
+
   t.throws(
     () => {
-      game.setMove(board, player, move);
+      game.checkMove(board, player, from, to);
     },
-    { message: "hop must be only one space" }
+    { message: "space is outside of board" }
   );
 });
 
-test("move hop must be within the board", (t) => {
+test("move must be diagonal", (t) => {
   const board = game.createEmptyBoard();
-  const space = { row: 1, column: 0 };
+  const from = { row: 1, column: 0 };
+  const to = { row: 1, column: 1 };
   const player = 0;
-  const move = { from: space, hop: { row: 2, column: -1 } };
-  grid.setValue(board, space, { player });
+
+  grid.setValue(board, from, { player });
+
   t.throws(
     () => {
-      game.setMove(board, player, move);
+      game.checkMove(board, player, from, to);
     },
-    { message: "space outside of board" }
+    { message: "piece is not moving diagonally" }
   );
 });
 
-test("regular piece cannot hop backwards", (t) => {
-  const board = game.createEmptyBoard();
-  const space = { row: 1, column: 0 };
-  const player = 0;
-  const move = { from: space, hop: { row: 0, column: 1 } };
-  grid.setValue(board, space, { player });
-  t.throws(
-    () => {
-      game.setMove(board, player, move);
-    },
-    { message: "unable to move regular piece backwards" }
-  );
+test("regular piece cannot move backwards", (t) => {
+  for (const player of [0, 1]) {
+    const board = game.createEmptyBoard();
+    const orientation = game.getOrientation(player);
+    const from = { row: 3, column: 4 };
+    const to = { row: from.row - orientation, column: 3 };
+
+    grid.setValue(board, from, { player });
+
+    t.throws(
+      () => {
+        game.checkMove(board, player, from, to);
+      },
+      { message: "piece is not allowed to move backwards" }
+    );
+  }
 });
 
-test("move hop space must be empty", (t) => {
+test("move space must be empty", (t) => {
   for (const king of [false, true]) {
     const board = game.createEmptyBoard();
+    const from = { row: 2, column: 3 };
     const player = 0;
     const piece = { player, king };
-    const space = { row: 2, column: 3 };
-    grid.setValue(board, space, piece);
+
+    grid.setValue(board, from, piece);
+
     for (const direction of game.getDirections(piece)) {
-      const adjacentSpace = game.getAdjacentSpace(space, direction);
-      grid.setValue(board, adjacentSpace, { player });
+      const to = game.getAdjacentSpace(from, direction);
+
+      grid.setValue(board, to, { player });
+
       t.throws(
         () => {
-          game.setMove(board, player, { from: space, hop: adjacentSpace });
+          game.checkMove(board, player, from, to);
         },
         { message: "space already occupied" }
       );
+    }
+  }
+});
+
+test("hop move must be one space", (t) => {
+  const board = game.createEmptyBoard();
+  const from = { row: 0, column: 1 };
+  const to = { row: 2, column: 3 };
+  const player = 0;
+
+  grid.setValue(board, from, { player });
+
+  t.throws(
+    () => {
+      game.setHop(board, player, from, to);
+    },
+    { message: "piece must travel one space" }
+  );
+});
+
+test("jump move must be two spaces", (t) => {
+  const board = game.createEmptyBoard();
+  const from = { row: 0, column: 1 };
+  const tos = [
+    { row: 1, column: 0 },
+    { row: 3, column: 4 },
+  ];
+  const player = 0;
+
+  grid.setValue(board, from, { player });
+
+  for (const to of tos) {
+    t.throws(
+      () => {
+        game.setJump(board, player, from, to);
+      },
+      { message: "piece must travel two spaces" }
+    );
+  }
+});
+
+test("able to move piece from one space to another", (t) => {
+  for (const player of [0, 1]) {
+    for (const king of [false, true]) {
+      for (const from of game.getSpaces()) {
+        for (const direction of game.getDirections({ player, king })) {
+          const to = game.getAdjacentSpace(from, direction);
+          if (to) {
+            const board = game.createEmptyBoard();
+            const piece = { player, king };
+
+            grid.setValue(board, from, piece);
+
+            // If piece moved to the other end, it should be kinged.
+            const kinged = game.movePiece(board, from, to);
+
+            if (!king && game.isKingable(to, player)) {
+              t.true(kinged);
+            } else {
+              t.false(kinged);
+            }
+          }
+        }
+      }
     }
   }
 });
@@ -399,18 +492,18 @@ test("able to determine king piece elligibility", (t) => {
 test("able to set a hop move", (t) => {
   for (const player of [0, 1]) {
     for (const king of [false, true]) {
-      for (const space of game.getSpaces()) {
+      for (const from of game.getSpaces()) {
         for (const direction of game.getDirections({ player, king })) {
-          const adjacentSpace = game.getAdjacentSpace(space, direction);
-          if (adjacentSpace) {
+          const hop = game.getAdjacentSpace(from, direction);
+          if (hop) {
             const board = game.createEmptyBoard();
             const piece = { player, king };
-            grid.setValue(board, space, piece);
-            game.setMove(board, player, { from: space, hop: adjacentSpace });
-            t.is(grid.getValue(board, space), null);
-            t.is(grid.getValue(board, adjacentSpace), piece);
+            grid.setValue(board, from, piece);
+            game.setMove(board, player, { from, hop });
+            t.is(grid.getValue(board, from), null);
+            t.is(grid.getValue(board, hop), piece);
             if (!king) {
-              t.is(piece.king, game.isKingable(adjacentSpace, player));
+              t.is(piece.king, game.isKingable(hop, player));
             }
           }
         }
@@ -423,19 +516,19 @@ test("able to set a jump move", (t) => {
   for (const player of [0, 1]) {
     const opponent = (player + 1) % game.numPlayers;
     for (const king of [false, true]) {
-      for (const space of game.getSpaces()) {
+      for (const from of game.getSpaces()) {
         for (const direction of game.getDirections({ player, king })) {
-          const capture = { space: game.getAdjacentSpace(space, direction) };
-          if (capture.space) {
-            const targetSpace = game.getAdjacentSpace(capture.space, direction);
+          const captureSpace = game.getAdjacentSpace(from, direction);
+          if (captureSpace) {
+            const targetSpace = game.getAdjacentSpace(captureSpace, direction);
             if (targetSpace) {
               const board = game.createEmptyBoard();
               const piece = { player, king };
-              grid.setValue(board, space, piece);
-              grid.setValue(board, capture.space, { player: opponent });
-              game.setMove(board, player, { from: space, jump: [targetSpace] });
-              t.is(grid.getValue(board, space), null);
-              t.is(grid.getValue(board, capture.space), null);
+              grid.setValue(board, from, piece);
+              grid.setValue(board, captureSpace, { player: opponent });
+              game.setMove(board, player, { from, jump: [targetSpace] });
+              t.is(grid.getValue(board, from), null);
+              t.is(grid.getValue(board, captureSpace), null);
               t.is(grid.getValue(board, targetSpace), piece);
               if (!king) {
                 t.is(piece.king, game.isKingable(targetSpace, player));
@@ -458,11 +551,11 @@ test("able to detect a win", (t) => {
     for (const space of game.getSpaces()) {
       const board = game.createEmptyBoard();
       grid.setValue(board, space, { player });
-      t.is(game.getWinner(board, player).player, player);
+      t.deepEqual({ player }, game.getWinner(board, player));
 
       // Easy way to set another space that is not the current one.
-      const inverseSpace = { row: space.column, column: space.row };
-      grid.setValue(board, inverseSpace, { player: opponent, king: true });
+      const otherSpace = { row: space.column, column: space.row };
+      grid.setValue(board, otherSpace, { player: opponent, king: true });
 
       t.is(game.getWinner(board, player), null);
     }

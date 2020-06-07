@@ -2,7 +2,6 @@ import GameClientBase from "/game.js";
 import * as grid from "/lib/grid.js";
 import * as rect from "/lib/rect.js";
 import * as game from "/lib/games/ttt.js";
-import { clear as clearCanvas } from "/lib/canvas.js";
 
 export default class GameClient extends GameClientBase {
   constructor({ url }) {
@@ -14,8 +13,7 @@ export default class GameClient extends GameClientBase {
 
     this.elements.container.addEventListener("mousemove", (event) => {
       if (this.isMyTurn()) {
-        const space = this.getSpace(event.offsetX, event.offsetY);
-        this.drawHints(space);
+        this.drawHints(this.getSpace(event.offsetX, event.offsetY));
       }
     });
 
@@ -32,11 +30,15 @@ export default class GameClient extends GameClientBase {
   }
 
   draw() {
-    super.draw();
-    this.drawBoard();
-    this.drawPieces();
-    this.drawHints();
-    this.drawWinner();
+    if (this.state) {
+      super.draw();
+      this.drawBoard();
+      this.drawPieces();
+      this.drawHints();
+      if (this.state.winner) {
+        this.drawWinner(this.state.winner);
+      }
+    }
   }
 
   resize() {
@@ -83,13 +85,16 @@ export default class GameClient extends GameClientBase {
   getSpace(x, y) {
     const { cellSize } = this.scale;
     const { left, top, width, height } = this.scale.board;
+
     const right = left + width;
     const bottom = top + height;
+
     if (x > left && x < right && y > top && y < bottom) {
       const row = Math.trunc((y - top) / cellSize);
       const column = Math.trunc((x - left) / cellSize);
       return { row, column };
     }
+
     return null;
   }
 
@@ -99,12 +104,7 @@ export default class GameClient extends GameClientBase {
   }
 
   drawBoard() {
-    if (!this.state) return;
-
-    const canvas = this.elements.board;
-    const context = canvas.getContext("2d");
-
-    clearCanvas(canvas, context);
+    const context = this.getContext(this.elements.board);
 
     const { cellSize } = this.scale;
     const { left, top, width, height } = this.scale.board;
@@ -113,6 +113,8 @@ export default class GameClient extends GameClientBase {
     context.lineWidth = this.getSize(0.1);
 
     const right = left + width;
+    const bottom = top + height;
+
     for (let row = 1; row < game.rows; row++) {
       const y = top + row * cellSize;
       context.beginPath();
@@ -121,7 +123,6 @@ export default class GameClient extends GameClientBase {
       context.stroke();
     }
 
-    const bottom = top + height;
     for (let column = 1; column < game.columns; column++) {
       const x = left + column * cellSize;
       context.beginPath();
@@ -132,30 +133,22 @@ export default class GameClient extends GameClientBase {
   }
 
   drawPieces() {
-    if (!this.state) return;
+    const context = this.getContext(this.elements.pieces);
 
-    const canvas = this.elements.pieces;
-    const context = canvas.getContext("2d");
-
-    clearCanvas(canvas, context);
-
-    for (const { space, value } of grid.getAllValues(this.state.board)) {
-      if (value) this.drawPiece(context, space, value.player);
+    for (const space of game.getSpaces()) {
+      const piece = grid.getValue(this.state.board, space);
+      if (piece) this.drawPiece(context, space, piece.player);
     }
   }
 
-  drawWinner() {
-    if (!this.state || !this.state.winner) return;
+  drawWinner(winner) {
+    const context = this.getContext(this.elements.hints);
 
-    const canvas = this.elements.hints;
-    const context = canvas.getContext("2d");
-
-    clearCanvas(canvas, context);
-
-    const { line, player } = this.state.winner;
+    const { line, player } = winner;
     const { cells, cellSize } = this.scale;
 
     context.fillStyle = player == this.player ? "darkgreen" : "darkred";
+
     for (const space of line) {
       const { left, top } = grid.getValue(cells, space);
       context.fillRect(left, top, cellSize, cellSize);
@@ -163,15 +156,10 @@ export default class GameClient extends GameClientBase {
   }
 
   drawHints(space = null) {
-    const canvas = this.elements.hints;
-    const context = canvas.getContext("2d");
-
-    clearCanvas(canvas, context);
-
-    if (!space || !this.isMyTurn()) return;
+    const context = this.getContext(this.elements.hints);
 
     // Don't draw indicator on space that is occupied.
-    if (grid.getValue(this.state.board, space)) return;
+    if (!space || grid.getValue(this.state.board, space)) return;
 
     const { cells, cellSize } = this.scale;
     const { left, top } = grid.getValue(cells, space);

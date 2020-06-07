@@ -2,7 +2,6 @@ import GameClientBase from "/game.js";
 import * as grid from "/lib/grid.js";
 import * as rect from "/lib/rect.js";
 import * as game from "/lib/games/c4.js";
-import { clear as clearCanvas } from "/lib/canvas.js";
 
 const colors = ["gold", "darkred"];
 
@@ -16,18 +15,15 @@ export default class GameClient extends GameClientBase {
 
     this.elements.container.addEventListener("mousemove", (event) => {
       if (this.isMyTurn()) {
-        const space = this.getSpace(event.offsetX, event.offsetY);
-        this.drawHints(space);
+        this.drawHints(this.getSpace(event.offsetX, event.offsetY));
       }
     });
 
     this.elements.container.addEventListener("click", (event) => {
       if (this.isMyTurn()) {
         const space = this.getSpace(event.offsetX, event.offsetY);
-        if (space) {
-          const { column } = space;
-          const playable = game.getPlayableSpace(this.state.board, column);
-          if (playable) this.move(column);
+        if (space && game.getPlayableSpace(this.state.board, space.column)) {
+          this.move(space.column);
         }
       }
     });
@@ -36,11 +32,15 @@ export default class GameClient extends GameClientBase {
   }
 
   draw() {
-    super.draw();
-    this.drawBoard();
-    this.drawPieces();
-    this.drawHints();
-    this.drawWinner();
+    if (this.state) {
+      super.draw();
+      this.drawBoard();
+      this.drawPieces();
+      this.drawHints();
+      if (this.state.winner) {
+        this.drawWinner(this.state.winner);
+      }
+    }
   }
 
   resize() {
@@ -104,23 +104,21 @@ export default class GameClient extends GameClientBase {
   getSpace(x, y) {
     const { cellSize } = this.scale;
     const { left, top, width, height } = this.scale.board;
+
     const right = left + width;
     const bottom = top + height;
+
     if (x > left && x < right && y > top && y < bottom) {
       const row = Math.trunc((bottom - y) / cellSize);
       const column = Math.trunc((x - left) / cellSize);
       return { row, column };
     }
+
     return null;
   }
 
   drawPieces() {
-    if (!this.state) return;
-
-    const canvas = this.elements.pieces;
-    const context = canvas.getContext("2d");
-
-    clearCanvas(canvas, context);
+    const context = this.getContext(this.elements.pieces);
 
     for (const space of game.getSpaces()) {
       const piece = grid.getValue(this.state.board, space);
@@ -130,9 +128,9 @@ export default class GameClient extends GameClientBase {
 
   drawPiece(context, space, piece) {
     const { cells, cellSize } = this.scale;
-    const cell = grid.getValue(cells, space);
+    const { left, top } = grid.getValue(cells, space);
     context.fillStyle = colors[piece.player];
-    context.fillRect(cell.left, cell.top, cellSize, cellSize);
+    context.fillRect(left, top, cellSize, cellSize);
   }
 
   getSize(scale) {
@@ -141,21 +139,19 @@ export default class GameClient extends GameClientBase {
   }
 
   drawBoard() {
-    if (!this.state) return;
-
-    const canvas = this.elements.board;
-    const context = canvas.getContext("2d");
-
-    clearCanvas(canvas, context);
+    const context = this.getContext(this.elements.board);
 
     const { left, top, width, height } = this.scale.frame;
+    const radius = this.getSize(0.4);
 
+    // Draw the board background.
     context.fillStyle = "darkblue";
-    context.globalCompositeOperation = "xor";
     context.fillRect(left, top, width, height);
 
-    const radius = this.getSize(0.4);
+    // Use xor to punch out holes.
     context.fillStyle = "white";
+    context.globalCompositeOperation = "xor";
+
     for (const space of game.getSpaces()) {
       const { cx, cy } = grid.getValue(this.scale.cells, space);
       context.beginPath();
@@ -165,41 +161,40 @@ export default class GameClient extends GameClientBase {
   }
 
   drawHints(space = null) {
-    const canvas = this.elements.hints;
-    const context = canvas.getContext("2d");
+    const context = this.getContext(this.elements.hints);
 
-    clearCanvas(canvas, context);
+    if (!space) return;
 
-    if (!space || !this.isMyTurn()) return;
+    const playableSpace = game.getPlayableSpace(this.state.board, space.column);
 
-    const playable = game.getPlayableSpace(this.state.board, space.column);
+    if (!playableSpace) return;
 
-    if (!playable) return;
-
-    const cell = grid.getValue(this.scale.cells, playable);
+    const { top } = this.scale.board;
+    const { cx, cy } = grid.getValue(this.scale.cells, playableSpace);
+    const arrowRadius = this.getSize(0.2);
+    const pieceRadius = this.getSize(0.4);
 
     context.strokeStyle = "white";
-    context.lineWidth = this.getSize(0.08);
-    context.beginPath();
-    context.moveTo(cell.cx, this.scale.board.top);
-    context.lineTo(cell.cx, cell.cy);
-    context.stroke();
-    context.closePath();
-
-    const arrowRadius = this.getSize(0.2);
-    context.beginPath();
-    context.moveTo(cell.cx - arrowRadius, cell.cy - arrowRadius);
-    context.lineTo(cell.cx, cell.cy);
-    context.lineTo(cell.cx + arrowRadius, cell.cy - arrowRadius);
-    context.stroke();
-    context.closePath();
-
-    const pieceRadius = this.getSize(0.4);
     context.fillStyle = colors[this.player];
+    context.lineWidth = this.getSize(0.08);
+
+    context.beginPath();
+    context.moveTo(cx, top);
+    context.lineTo(cx, cy);
+    context.stroke();
+    context.closePath();
+
+    context.beginPath();
+    context.moveTo(cx - arrowRadius, cy - arrowRadius);
+    context.lineTo(cx, cy);
+    context.lineTo(cx + arrowRadius, cy - arrowRadius);
+    context.stroke();
+    context.closePath();
+
     context.beginPath();
     context.ellipse(
-      cell.cx,
-      this.scale.board.top - pieceRadius,
+      cx,
+      top - pieceRadius,
       pieceRadius,
       pieceRadius,
       0,
@@ -209,15 +204,8 @@ export default class GameClient extends GameClientBase {
     context.fill();
   }
 
-  drawWinner() {
-    if (!this.state || !this.state.winner) return;
-
-    const canvas = this.elements.hints;
-    const context = canvas.getContext("2d");
-
-    clearCanvas(canvas, context);
-
-    const { winner } = this.state;
+  drawWinner(winner) {
+    const context = this.getContext(this.elements.hints);
 
     for (const space of winner.line) {
       const cell = grid.getValue(this.scale.cells, space);
@@ -231,7 +219,11 @@ export default class GameClient extends GameClientBase {
     const width = this.getSize(0.06);
     const radius = this.getSize(0.15);
 
+    context.lineCap = "round";
+    context.lineWidth = width;
     context.fillStyle = color;
+    context.strokeStyle = color;
+
     context.beginPath();
     context.ellipse(cx - radius, cy - radius, width, width, 0, 0, 2 * Math.PI);
     context.ellipse(cx + radius, cy - radius, width, width, 0, 0, 2 * Math.PI);
@@ -239,9 +231,6 @@ export default class GameClient extends GameClientBase {
 
     const offset = won ? 0 : radius;
 
-    context.lineCap = "round";
-    context.lineWidth = width;
-    context.strokeStyle = color;
     context.beginPath();
     context.arc(cx, cy + offset, radius, Math.PI, 2 * Math.PI, won);
     context.stroke();

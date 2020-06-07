@@ -143,3 +143,72 @@ test("able to move value from one space to another", (t) => {
   t.is(grid.getValue(g, to), value);
   t.is(grid.getValue(g, from), null);
 });
+
+test("able to get the distance from one space to another", (t) => {
+  const row = getRandomInteger();
+  const column = getRandomInteger();
+
+  const rowDistance = getRandomInteger();
+  const columnDistance = getRandomInteger();
+
+  const distance = { row: rowDistance, column: columnDistance };
+
+  const from = { row, column };
+  const to = grid.addSpace(from, distance);
+
+  t.deepEqual(grid.getDistance(from, to), distance);
+
+  // Distance from a space to itself should be zero.
+  t.deepEqual(grid.getDistance(from, from), { row: 0, column: 0 });
+});
+
+test("able to get the direction from one space to another", (t) => {
+  const rows = getRandomInteger();
+  const columns = getRandomInteger();
+
+  function* getSpaces() {
+    for (let row = -rows; row <= rows; row++) {
+      for (let column = -columns; column <= columns; column++) {
+        yield { row, column };
+      }
+    }
+  }
+
+  for (const from of getSpaces()) {
+    for (const to of getSpaces()) {
+      const distance = grid.getDistance(from, to);
+      const direction = grid.getDirection(from, to);
+      if (distance.row < 0 && distance.column == 0) {
+        t.deepEqual(direction, grid.direction.north);
+      } else if (distance.row > 0 && distance.column == 0) {
+        t.deepEqual(direction, grid.direction.south);
+      } else if (distance.row == 0 && distance.column > 0) {
+        t.deepEqual(direction, grid.direction.east);
+      } else if (distance.row == 0 && distance.column < 0) {
+        t.deepEqual(direction, grid.direction.west);
+      } else if (distance.row < 0 && distance.column > 0) {
+        t.deepEqual(direction, grid.direction.northeast);
+      } else if (distance.row < 0 && distance.column < 0) {
+        t.deepEqual(direction, grid.direction.northwest);
+      } else if (distance.row > 0 && distance.column > 0) {
+        t.deepEqual(direction, grid.direction.southeast);
+      } else if (distance.row > 0 && distance.column < 0) {
+        t.deepEqual(direction, grid.direction.southwest);
+      }
+    }
+  }
+});
+
+test("able to get the inverse of a space", (t) => {
+  const rows = getRandomInteger();
+  const columns = getRandomInteger();
+
+  for (let row = -rows; row <= rows; row++) {
+    for (let column = -columns; column <= columns; column++) {
+      const space = { row, column };
+      const inverse = grid.invertSpace(space);
+      t.is(inverse.row, -space.row);
+      t.is(inverse.column, -space.column);
+    }
+  }
+});

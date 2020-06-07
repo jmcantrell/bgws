@@ -1,4 +1,4 @@
-import { resize as resizeCanvas } from "/lib/canvas.js";
+import * as canvas from "/lib/canvas.js";
 
 export default class GameClientBase {
   constructor({ url, game }) {
@@ -106,15 +106,13 @@ export default class GameClientBase {
   }
 
   resize() {
-    const { clientWidth, clientHeight } = this.elements.container;
-    const viewport = {
-      left: 0,
-      top: 0,
-      width: clientWidth,
-      height: clientHeight,
-    };
-    for (const canvas of this.layers) {
-      resizeCanvas(canvas, viewport);
+    const {
+      clientWidth: width,
+      clientHeight: height,
+    } = this.elements.container;
+    const viewport = { left: 0, top: 0, width, height };
+    for (const layer of this.layers) {
+      canvas.resize(layer, viewport);
     }
     return viewport;
   }
@@ -132,13 +130,21 @@ export default class GameClientBase {
   addLayer(id) {
     const index = Object.keys(this.layers).length;
     const { container } = this.elements;
-    const canvas = document.createElement("canvas");
-    canvas.id = id;
-    canvas.style.zIndex = index;
-    canvas.classList.add("layer");
-    container.appendChild(canvas);
-    this.layers.push(canvas);
-    this.elements[id] = canvas;
+    const layer = document.createElement("canvas");
+    layer.id = id;
+    layer.style.zIndex = index;
+    layer.classList.add("layer");
+    container.appendChild(layer);
+    this.layers.push(layer);
+    this.elements[id] = layer;
+  }
+
+  getContext(layer) {
+    const context = layer.getContext("2d");
+    const dpr = window.devicePixelRatio;
+    // context.scale(dpr, dpr);
+    canvas.clear(layer, context);
+    return context;
   }
 
   send(command) {

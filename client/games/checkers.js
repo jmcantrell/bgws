@@ -1,8 +1,7 @@
+import GameClientBase from "/game.js";
 import * as grid from "/lib/grid.js";
 import * as rect from "/lib/rect.js";
 import * as game from "/lib/games/checkers.js";
-import GameClientBase from "/game.js";
-import { clear as clearCanvas } from "/lib/canvas.js";
 
 const colors = ["black", "darkred"];
 
@@ -16,8 +15,7 @@ export default class GameClient extends GameClientBase {
 
     this.elements.container.addEventListener("mousemove", (event) => {
       if (this.isMyTurn()) {
-        const space = this.getSpace(event.offsetX, event.offsetY);
-        this.drawHints(space);
+        this.drawHints(this.getSpace(event.offsetX, event.offsetY));
       }
     });
 
@@ -38,10 +36,12 @@ export default class GameClient extends GameClientBase {
   }
 
   draw() {
-    super.draw();
-    this.drawBoard();
-    this.drawPieces();
-    this.drawHints();
+    if (this.state) {
+      super.draw();
+      this.drawBoard();
+      this.drawPieces();
+      this.drawHints();
+    }
   }
 
   resize() {
@@ -55,11 +55,10 @@ export default class GameClient extends GameClientBase {
     delete this.selected;
     delete this.selectable;
     delete this.selectedMove;
-    this.draw();
   }
 
   onSpaceClick(space) {
-    if (this.isSelectable(space) && !this.isJumpStarted()) {
+    if (this.isSelectable(space)) {
       this.selectPiece(space);
     } else {
       this.selectTarget(space);
@@ -69,43 +68,46 @@ export default class GameClient extends GameClientBase {
 
   selectPiece(space) {
     this.selected = space;
-    const piece = grid.getValue(this.state.board, space);
     this.selectedMove = { from: space };
+
+    const piece = grid.getValue(this.state.board, space);
     const jumps = game.getJumps(this.state.board, space, piece);
 
     if (jumps.length > 0) {
       this.selectedMove.jump = [];
-      this.targets = jumps.map((jump) => jump.space);
+      this.targets = jumps;
     } else {
       this.targets = game.getHops(this.state.board, space, piece);
     }
+
+    // Clear last move hints so they don't interfere.
+    delete this.state.lastMove;
   }
 
   selectTarget(space) {
     if (this.isTarget(space)) {
       if (this.selectedMove.jump) {
-        this.addJumpStep(space);
-        if (this.targets.length == 0) {
-          this.move();
-        }
+        this.setJump(space);
       } else {
-        this.selectedMove.hop = space;
-        this.move();
+        this.setHop(space);
       }
     }
   }
 
-  addJumpStep(space) {
-    const piece = grid.getValue(this.state.board, this.selected);
+  setHop(space) {
+    game.setHop(this.state.board, this.player, this.selected, space);
+    this.selectedMove.hop = space;
+    this.move();
+  }
 
-    // Get the selected jump.
-    const jump = game
-      .getJumps(this.state.board, this.selected, piece)
-      .find((jump) => grid.isSameSpace(jump.space, space));
+  setJump(space) {
+    // Save the king state of the piece to calculate jumps later.
+    // Piece could be kinged on the next jump, and, if so, should not be
+    // allowed to continue jumping.
+    const { player, king } = grid.getValue(this.state.board, this.selected);
 
     // Move the piece and clear capture.
-    grid.setValue(this.state.board, jump.capture.space, null);
-    grid.moveValue(this.state.board, this.selected, space);
+    game.setJump(this.state.board, player, this.selected, space);
 
     // Add the selected jump;
     this.selectedMove.jump.push(space);
@@ -117,9 +119,11 @@ export default class GameClient extends GameClientBase {
     delete this.selectable;
 
     // Reset the jump targets to newly available jumps.
-    this.targets = game
-      .getJumps(this.state.board, this.selected, piece)
-      .map((jump) => jump.space);
+    this.targets = game.getJumps(this.state.board, space, { player, king });
+
+    if (this.targets.length == 0) {
+      this.move();
+    }
   }
 
   isJumpStarted() {
@@ -134,13 +138,15 @@ export default class GameClient extends GameClientBase {
     const hoppable = [];
     const jumpable = [];
 
+    const { board } = this.state;
+
     // Group all available moves by type.
     for (const space of game.getSpaces()) {
       const piece = grid.getValue(this.state.board, space);
       if (piece && piece.player == this.player) {
-        const hops = game.getHops(this.state.board, space, piece);
+        const hops = game.getHops(board, space, piece);
         if (hops.length > 0) hoppable.push(space);
-        const jumps = game.getJumps(this.state.board, space, piece);
+        const jumps = game.getJumps(board, space, piece);
         if (jumps.length > 0) jumpable.push(space);
       }
     }
@@ -149,17 +155,13 @@ export default class GameClient extends GameClientBase {
   }
 
   isSelectable(space) {
-    if (!this.selectable) return false;
+    if (!this.selectable || this.isJumpStarted()) return false;
     return this.selectable.some((s) => grid.isSameSpace(s, space));
   }
 
   isTarget(space) {
     if (!this.targets) return null;
     return this.targets.find((t) => grid.isSameSpace(t, space));
-  }
-
-  getMoves(space) {
-    return grid.getValue(this.indexedMoves, space);
   }
 
   setScale(viewport) {
@@ -247,9 +249,7 @@ export default class GameClient extends GameClientBase {
 
   drawBoard() {
     if (!this.state) return;
-
-    const canvas = this.elements.board;
-    const context = canvas.getContext("2d");
+    const context = this.getContext(this.elements.board);
 
     const { frame, board, cells, cellSize } = this.scale;
 
@@ -268,9 +268,7 @@ export default class GameClient extends GameClientBase {
 
   drawPieces() {
     if (!this.state) return;
-
-    const canvas = this.elements.pieces;
-    const context = canvas.getContext("2d");
+    const context = this.getContext(this.elements.pieces);
 
     for (const space of game.getSpaces()) {
       const piece = grid.getValue(this.state.board, space);
@@ -279,9 +277,7 @@ export default class GameClient extends GameClientBase {
   }
 
   drawHints(space = null) {
-    const canvas = this.elements.hints;
-    const context = canvas.getContext("2d");
-    clearCanvas(canvas, context);
+    const context = this.getContext(this.elements.hints);
 
     if (!this.state || !this.isMyTurn()) return;
 
@@ -301,6 +297,10 @@ export default class GameClient extends GameClientBase {
       }
     }
 
+    if (this.state.lastMove) {
+      this.drawMove(context, this.state.lastMove);
+    }
+
     if (space) {
       if (this.isTarget(space) || this.isSelectable(space)) {
         this.drawSelected(context, space);
@@ -308,44 +308,167 @@ export default class GameClient extends GameClientBase {
     }
   }
 
+  drawMove(context, move) {
+    this.drawSelected(context, move.from);
+    let to;
+    if (move.hop) {
+      this.drawConnection(context, move.from, move.hop);
+      this.drawTerminus(context, move.from, move.hop);
+      this.drawSelected(context, move.hop);
+      to = move.hop;
+    } else {
+      let prev = move.from;
+      for (const step of move.jump) {
+        const direction = grid.getDirection(prev, step);
+        const capture = grid.addSpace(prev, direction);
+        this.drawConnection(context, prev, capture);
+        this.drawSelected(context, capture);
+        this.drawCaptured(context, capture);
+        this.drawConnection(context, capture, step);
+        this.drawTerminus(context, capture, step);
+        this.drawSelected(context, step);
+        prev = step;
+      }
+      to = prev;
+    }
+    if (move.kinged) {
+      this.drawKinged(context, to);
+    }
+  }
+
   drawPiece(context, space, piece) {
     const { cx, cy } = grid.getValue(this.scale.cells, space);
-    const radius = this.getSize(0.35);
+    const pieceRadius = this.getSize(0.35);
+
     context.fillStyle = colors[piece.player];
     context.strokeStyle = "darkgrey";
-    context.lineWidth = 2;
+    context.lineWidth = this.getSize(0.05);
+
     context.beginPath();
-    context.ellipse(cx, cy, radius, radius, 0, 0, 2 * Math.PI);
+    context.ellipse(cx, cy, pieceRadius, pieceRadius, 0, 0, 2 * Math.PI);
     context.fill();
     context.stroke();
+
     if (piece.king) {
-      const radius = this.getSize(0.15);
+      const kingRadius = this.getSize(0.15);
       context.fillStyle = "white";
+
       context.beginPath();
-      context.ellipse(cx, cy, radius, radius, 0, 0, 2 * Math.PI);
+      context.ellipse(cx, cy, kingRadius, kingRadius, 0, 0, 2 * Math.PI);
       context.fill();
     }
   }
 
   drawSelected(context, space) {
     const { cx, cy } = grid.getValue(this.scale.cells, space);
-    const radius = this.getSize(0.4);
+    const selectRadius = this.getSize(0.4);
+
     context.strokeStyle = "white";
-    context.lineWidth = 2;
+    context.lineWidth = this.getSize(0.03);
     context.setLineDash([]);
+
     context.beginPath();
-    context.ellipse(cx, cy, radius, radius, 0, 0, 2 * Math.PI);
+    context.ellipse(cx, cy, selectRadius, selectRadius, 0, 0, 2 * Math.PI);
     context.stroke();
   }
 
   drawSelectable(context, space) {
     const { cx, cy } = grid.getValue(this.scale.cells, space);
-    const radius = this.getSize(0.4);
+    const selectRadius = this.getSize(0.4);
+
     context.strokeStyle = "white";
-    context.lineWidth = 2;
+    context.lineWidth = this.getSize(0.03);
     context.setLineDash([5, 5]);
+
     context.beginPath();
-    context.ellipse(cx, cy, radius, radius, 0, 0, 2 * Math.PI);
+    context.ellipse(cx, cy, selectRadius, selectRadius, 0, 0, 2 * Math.PI);
     context.stroke();
+  }
+
+  drawCaptured(context, space) {
+    const { cx, cy } = grid.getValue(this.scale.cells, space);
+    const r = this.getSize(0.15);
+
+    context.strokeStyle = "white";
+    context.lineWidth = this.getSize(0.08);
+
+    context.beginPath();
+    context.moveTo(cx - r, cy - r);
+    context.lineTo(cx + r, cy + r);
+    context.stroke();
+
+    context.beginPath();
+    context.moveTo(cx - r, cy + r);
+    context.lineTo(cx + r, cy - r);
+    context.stroke();
+  }
+
+  drawKinged(context, space) {
+    const { cx, cy } = grid.getValue(this.scale.cells, space);
+    const r = this.getSize(0.1);
+
+    context.strokeStyle = "black";
+    context.lineWidth = this.getSize(0.08);
+
+    context.beginPath();
+    context.moveTo(cx - r, cy);
+    context.lineTo(cx + r, cy);
+    context.stroke();
+
+    context.beginPath();
+    context.moveTo(cx, cy - r);
+    context.lineTo(cx, cy + r);
+    context.stroke();
+  }
+
+  getConnector(space, direction) {
+    const { cx, cy } = grid.getValue(this.scale.cells, space);
+    const selectRadius = this.getSize(0.4);
+
+    const angle = Math.atan2(direction.row, direction.column);
+    const { x, y } = this.pointOnCircle(cx, cy, selectRadius, angle);
+    return { x, y, angle };
+  }
+
+  drawTerminus(context, from, to) {
+    const direction = grid.getDirection(to, from);
+    const r = this.getSize(0.15);
+    const { x, y, angle } = this.getConnector(to, direction);
+
+    context.strokeStyle = "white";
+    context.lineWidth = this.getSize(0.03);
+
+    const left = this.pointOnCircle(x, y, r, angle - 0.5);
+    context.beginPath();
+    context.moveTo(x, y);
+    context.lineTo(left.x, left.y);
+    context.stroke();
+
+    const right = this.pointOnCircle(x, y, r, angle + 0.5);
+    context.beginPath();
+    context.moveTo(x, y);
+    context.lineTo(right.x, right.y);
+    context.stroke();
+  }
+
+  drawConnection(context, from, to) {
+    const tail = this.getConnector(from, grid.getDirection(from, to));
+    const head = this.getConnector(to, grid.getDirection(to, from));
+
+    context.strokeStyle = "white";
+    context.lineWidth = this.getSize(0.03);
+
+    context.beginPath();
+    context.moveTo(tail.x, tail.y);
+    context.lineTo(head.x, head.y);
+    context.stroke();
+  }
+
+  pointOnCircle(cx, cy, radius, angle) {
+    const orientation = game.getOrientation(this.player);
+    return {
+      x: cx + radius * -orientation * Math.cos(angle),
+      y: cy + radius * -orientation * Math.sin(angle),
+    };
   }
 }

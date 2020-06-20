@@ -2,6 +2,8 @@
 
 A multiplayer turn-based board game server with no chat.
 
+Check out a [live demonstration](https://jmcantrell-bgws.herokuapp.com/)!
+
 ## Games
 
 * Checkers

@@ -20,6 +20,7 @@ export default function create({ games, logger }) {
   app.locals.pretty = true;
   app.locals.title = pkg.title;
   app.locals.homepage = pkg.homepage;
+  app.locals.description = pkg.description;
   app.locals.games = Array.from(games.values());
 
   app.use(helmet());

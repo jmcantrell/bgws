@@ -1,9 +1,9 @@
 {
-  "name": "gws",
+  "name": "bgws",
   "version": "1.0.0",
-  "title": "Games with STRANGERS",
-  "description": "multiplayer board game server",
-  "homepage": "https://github.com/jmcantrell/gws",
+  "title": "Board Games with STRANGERS",
+  "description": "Multiplayer board games without chat.",
+  "homepage": "https://github.com/jmcantrell/bgws",
   "type": "module",
   "scripts": {
     "start": "concurrently 'npm:start-*'",
